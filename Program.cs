@@ -124,6 +124,7 @@ app.UseMiddleware<CorsMiddleware>();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseMiddleware<RequestLoggingMiddleware>();
 app.UseMiddleware<AuditLoggingMiddleware>();
+app.UseMiddleware<SwaggerAuthMiddleware>();
 
 // Only use HTTPS redirection in production
 if (!app.Environment.IsDevelopment())
