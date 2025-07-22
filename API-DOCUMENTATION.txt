@@ -1,0 +1,560 @@
+===============================================================================
+                      ELECTION API .NET - DOCUMENTAÇÃO COMPLETA
+===============================================================================
+
+BASE URL: http://localhost:5000
+API VERSION: 1.0.0
+AUTHENTICATION: JWT Bearer Token
+
+===============================================================================
+                                ESTRUTURA DA API
+===============================================================================
+
+ENDPOINTS PRINCIPAIS:
+- API Info: GET /
+- Health Check: GET /health
+- Swagger Documentation: GET /swagger
+- Authentication: /api/auth/*
+- Elections: /api/election/*
+
+FORMATO DE RESPOSTA PADRÃO:
+{
+    "success": true,
+    "message": "Success message",
+    "data": { /* response data */ },
+    "errors": null
+}
+
+===============================================================================
+                            AUTENTICAÇÃO - /api/auth
+===============================================================================
+
+1. LOGIN DE ADMINISTRADOR
+   Método: POST
+   Endpoint: /api/auth/admin/login
+   Autenticação: Não requerida
+   
+   BODY (JSON):
+   {
+       "email": "string",      // Obrigatório, formato email
+       "password": "string"    // Obrigatório
+   }
+   
+   EXEMPLO:
+   {
+       "email": "admin@election-system.com",
+       "password": "admin123"
+   }
+   
+   RESPOSTA (200 OK):
+   {
+       "success": true,
+       "message": "Success",
+       "data": {
+           "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+           "user": {
+               "id": 1,
+               "name": "Administrator",
+               "email": "admin@election-system.com",
+               "role": "super_admin",
+               "permissions": "all",
+               "cpf": null,
+               "voteWeight": 0
+           },
+           "expiresIn": 3600    // 1 hora em segundos
+       }
+   }
+   
+   POSSÍVEIS ERROS:
+   - 400 Bad Request: Dados inválidos
+   - 401 Unauthorized: Credenciais inválidas
+   - 500 Internal Server Error: Erro no servidor
+
+2. LOGIN DE ELEITOR
+   Método: POST
+   Endpoint: /api/auth/voter/login
+   Autenticação: Não requerida
+   
+   BODY (JSON):
+   {
+       "email": "string",      // Obrigatório, formato email
+       "password": "string"    // Obrigatório
+   }
+   
+   EXEMPLO:
+   {
+       "email": "joao@example.com",
+       "password": "voter123"
+   }
+   
+   RESPOSTA (200 OK):
+   {
+       "success": true,
+       "message": "Success",
+       "data": {
+           "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+           "user": {
+               "id": 1,
+               "name": "João Silva",
+               "email": "joao@example.com",
+               "role": null,
+               "permissions": null,
+               "cpf": "12345678901",
+               "voteWeight": 1.0
+           },
+           "expiresIn": 300     // 5 minutos em segundos
+       }
+   }
+   
+   POSSÍVEIS ERROS:
+   - 400 Bad Request: Dados inválidos
+   - 401 Unauthorized: Credenciais inválidas
+   - 403 Forbidden: Conta inativa ou não verificada
+   - 500 Internal Server Error: Erro no servidor
+
+3. LOGOUT
+   Método: POST
+   Endpoint: /api/auth/logout
+   Autenticação: Não requerida (mas registra no log se autenticado)
+   
+   BODY: Não necessário
+   
+   RESPOSTA (200 OK):
+   {
+       "success": true,
+       "message": "Logged out successfully",
+       "data": null
+   }
+
+4. VALIDAR TOKEN
+   Método: POST
+   Endpoint: /api/auth/validate
+   Autenticação: Bearer Token no header
+   
+   HEADERS:
+   Authorization: Bearer {token}
+   
+   BODY: Não necessário
+   
+   RESPOSTA (200 OK):
+   {
+       "success": true,
+       "message": "Success",
+       "data": {
+           "valid": true,
+           "userId": 1,
+           "role": "admin"
+       }
+   }
+   
+   POSSÍVEIS ERROS:
+   - 401 Unauthorized: Token inválido ou não fornecido
+   - 500 Internal Server Error: Erro na validação
+
+===============================================================================
+                            ELEIÇÕES - /api/election
+===============================================================================
+
+TODOS OS ENDPOINTS DE ELEIÇÕES REQUEREM AUTENTICAÇÃO JWT
+HEADERS OBRIGATÓRIOS:
+Authorization: Bearer {token}
+Content-Type: application/json
+
+5. LISTAR ELEIÇÕES (Admin Only)
+   Método: GET
+   Endpoint: /api/election
+   Autenticação: Admin (Bearer Token)
+   
+   QUERY PARAMETERS (Opcionais):
+   - page: Número da página (padrão: 1)
+   - limit: Itens por página (padrão: 10)
+   - status: Filtro por status (draft, scheduled, active, completed, cancelled)
+   - type: Filtro por tipo (internal, external, etc.)
+   
+   EXEMPLO DE URL:
+   GET /api/election?page=1&limit=20&status=active&type=internal
+   
+   RESPOSTA (200 OK):
+   {
+       "success": true,
+       "message": "Success",
+       "data": {
+           "items": [
+               {
+                   "id": 1,
+                   "title": "Eleição de Exemplo 2024",
+                   "description": "Descrição da eleição",
+                   "electionType": "internal",
+                   "status": "draft",
+                   "startDate": "2024-12-01T09:00:00",
+                   "endDate": "2024-12-01T18:00:00",
+                   "timezone": "America/Sao_Paulo",
+                   "allowBlankVotes": true,
+                   "allowNullVotes": true,
+                   "requireJustification": false,
+                   "maxVotesPerVoter": 1,
+                   "votingMethod": "single_choice",
+                   "resultsVisibility": "after_election",
+                   "createdBy": 1,
+                   "updatedBy": 1,
+                   "createdAt": "2024-01-01T10:00:00",
+                   "updatedAt": "2024-01-01T10:00:00"
+               }
+           ],
+           "totalItems": 1,
+           "totalPages": 1,
+           "currentPage": 1,
+           "hasNextPage": false,
+           "hasPreviousPage": false
+       }
+   }
+
+6. BUSCAR ELEIÇÃO POR ID (Admin Only)
+   Método: GET
+   Endpoint: /api/election/{id}
+   Autenticação: Admin (Bearer Token)
+   
+   EXEMPLO:
+   GET /api/election/1
+   
+   RESPOSTA (200 OK):
+   {
+       "success": true,
+       "message": "Success",
+       "data": {
+           "id": 1,
+           "title": "Eleição de Exemplo 2024",
+           "description": "Descrição da eleição",
+           "electionType": "internal",
+           "status": "draft",
+           "startDate": "2024-12-01T09:00:00",
+           "endDate": "2024-12-01T18:00:00",
+           "timezone": "America/Sao_Paulo",
+           "allowBlankVotes": true,
+           "allowNullVotes": true,
+           "requireJustification": false,
+           "maxVotesPerVoter": 1,
+           "votingMethod": "single_choice",
+           "resultsVisibility": "after_election",
+           "createdBy": 1,
+           "updatedBy": 1,
+           "createdAt": "2024-01-01T10:00:00",
+           "updatedAt": "2024-01-01T10:00:00"
+       }
+   }
+   
+   POSSÍVEIS ERROS:
+   - 404 Not Found: Eleição não encontrada
+
+7. CRIAR NOVA ELEIÇÃO (Admin Only)
+   Método: POST
+   Endpoint: /api/election
+   Autenticação: Admin (Bearer Token)
+   
+   BODY (JSON):
+   {
+       "title": "string",              // Obrigatório, máx 255 caracteres
+       "description": "string",        // Opcional
+       "electionType": "string",       // Padrão: "internal", máx 50 caracteres
+       "startDate": "2024-12-01T09:00:00",  // Obrigatório, formato ISO 8601
+       "endDate": "2024-12-01T18:00:00",    // Obrigatório, formato ISO 8601
+       "timezone": "string",           // Padrão: "America/Sao_Paulo", máx 100 caracteres
+       "allowBlankVotes": boolean,     // Padrão: false
+       "allowNullVotes": boolean,      // Padrão: false
+       "requireJustification": boolean, // Padrão: false
+       "maxVotesPerVoter": integer,    // Padrão: 1
+       "votingMethod": "string",       // Padrão: "single_choice", máx 20 caracteres
+       "resultsVisibility": "string"   // Padrão: "after_election", máx 20 caracteres
+   }
+   
+   EXEMPLO:
+   {
+       "title": "Eleição Teste 2024",
+       "description": "Eleição para teste do sistema",
+       "electionType": "internal",
+       "startDate": "2024-12-01T09:00:00",
+       "endDate": "2024-12-01T18:00:00",
+       "timezone": "America/Sao_Paulo",
+       "allowBlankVotes": true,
+       "allowNullVotes": false,
+       "requireJustification": false,
+       "maxVotesPerVoter": 1,
+       "votingMethod": "single_choice",
+       "resultsVisibility": "after_election"
+   }
+   
+   RESPOSTA (201 Created):
+   {
+       "success": true,
+       "message": "Election created successfully",
+       "data": {
+           "id": 2,
+           "title": "Eleição Teste 2024",
+           "description": "Eleição para teste do sistema",
+           "electionType": "internal",
+           "status": "draft",
+           "startDate": "2024-12-01T09:00:00",
+           "endDate": "2024-12-01T18:00:00",
+           "timezone": "America/Sao_Paulo",
+           "allowBlankVotes": true,
+           "allowNullVotes": false,
+           "requireJustification": false,
+           "maxVotesPerVoter": 1,
+           "votingMethod": "single_choice",
+           "resultsVisibility": "after_election",
+           "createdBy": 1,
+           "updatedBy": 1,
+           "createdAt": "2024-01-01T10:00:00",
+           "updatedAt": "2024-01-01T10:00:00"
+       }
+   }
+
+8. ATUALIZAR ELEIÇÃO (Admin Only)
+   Método: PUT
+   Endpoint: /api/election/{id}
+   Autenticação: Admin (Bearer Token)
+   
+   BODY (JSON) - Todos os campos opcionais:
+   {
+       "title": "string",              // Opcional, máx 255 caracteres
+       "description": "string",        // Opcional
+       "electionType": "string",       // Opcional, máx 50 caracteres
+       "startDate": "2024-12-01T09:00:00",  // Opcional, formato ISO 8601
+       "endDate": "2024-12-01T18:00:00",    // Opcional, formato ISO 8601
+       "timezone": "string",           // Opcional, máx 100 caracteres
+       "allowBlankVotes": boolean,     // Opcional
+       "allowNullVotes": boolean,      // Opcional
+       "requireJustification": boolean, // Opcional
+       "maxVotesPerVoter": integer,    // Opcional
+       "votingMethod": "string",       // Opcional, máx 20 caracteres
+       "resultsVisibility": "string"   // Opcional, máx 20 caracteres
+   }
+   
+   EXEMPLO:
+   PUT /api/election/1
+   {
+       "title": "Eleição Atualizada 2024",
+       "description": "Descrição atualizada"
+   }
+   
+   RESPOSTA (200 OK):
+   {
+       "success": true,
+       "message": "Election updated successfully",
+       "data": {
+           "id": 1,
+           "title": "Eleição Atualizada 2024",
+           "description": "Descrição atualizada",
+           // ... outros campos
+       }
+   }
+   
+   POSSÍVEIS ERROS:
+   - 404 Not Found: Eleição não encontrada
+
+9. DELETAR ELEIÇÃO (Admin Only)
+   Método: DELETE
+   Endpoint: /api/election/{id}
+   Autenticação: Admin (Bearer Token)
+   
+   EXEMPLO:
+   DELETE /api/election/1
+   
+   RESPOSTA (200 OK):
+   {
+       "success": true,
+       "message": "Election deleted successfully",
+       "data": null
+   }
+   
+   POSSÍVEIS ERROS:
+   - 404 Not Found: Eleição não encontrada
+
+10. ATUALIZAR STATUS DA ELEIÇÃO (Admin Only)
+    Método: PATCH
+    Endpoint: /api/election/{id}/status
+    Autenticação: Admin (Bearer Token)
+    
+    BODY (JSON):
+    {
+        "status": "string"  // Obrigatório: draft, scheduled, active, completed, cancelled
+    }
+    
+    EXEMPLO:
+    PATCH /api/election/1/status
+    {
+        "status": "active"
+    }
+    
+    RESPOSTA (200 OK):
+    {
+        "success": true,
+        "message": "Election status updated successfully",
+        "data": null
+    }
+    
+    POSSÍVEIS ERROS:
+    - 400 Bad Request: Status inválido
+    - 404 Not Found: Eleição não encontrada
+
+11. BUSCAR ELEIÇÕES ATIVAS (Público)
+    Método: GET
+    Endpoint: /api/election/active
+    Autenticação: Não requerida
+    
+    RESPOSTA (200 OK):
+    {
+        "success": true,
+        "message": "Success",
+        "data": [
+            {
+                "id": 1,
+                "title": "Eleição Ativa 2024",
+                "description": "Descrição da eleição ativa",
+                "startDate": "2024-12-01T09:00:00",
+                "endDate": "2024-12-01T18:00:00"
+            }
+        ]
+    }
+
+===============================================================================
+                                CÓDIGOS DE STATUS
+===============================================================================
+
+200 OK - Requisição bem-sucedida
+201 Created - Recurso criado com sucesso
+400 Bad Request - Dados inválidos na requisição
+401 Unauthorized - Token inválido ou não fornecido
+403 Forbidden - Acesso negado (conta inativa, permissões insuficientes)
+404 Not Found - Recurso não encontrado
+500 Internal Server Error - Erro interno do servidor
+
+===============================================================================
+                              DADOS DE TESTE PADRÃO
+===============================================================================
+
+ADMIN PADRÃO:
+Email: admin@election-system.com
+Senha: admin123
+Permissões: Administrador completo
+
+ELEITOR DE EXEMPLO:
+Email: joao@example.com
+Senha: voter123
+Status: Ativo e verificado
+
+ELEIÇÃO DE EXEMPLO:
+ID: 1
+Título: "Eleição de Exemplo 2024"
+Status: Draft
+Candidatos: Maria Santos (10) e Carlos Oliveira (20)
+
+===============================================================================
+                            AUTENTICAÇÃO JWT
+===============================================================================
+
+COMO USAR:
+1. Faça login via POST /api/auth/admin/login ou /api/auth/voter/login
+2. Extraia o token da resposta (campo "token")
+3. Inclua o token no header Authorization de requisições protegidas:
+   Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+TEMPO DE EXPIRAÇÃO:
+- Admin: 1 hora (3600 segundos)
+- Voter: 5 minutos (300 segundos)
+
+VALIDAÇÃO:
+Use POST /api/auth/validate para verificar se um token ainda é válido
+
+===============================================================================
+                              LOGS E AUDITORIA
+===============================================================================
+
+Todas as ações importantes são registradas automaticamente:
+- Logins e logouts
+- Criação, edição e exclusão de eleições
+- Mudanças de status de eleições
+- Tentativas de acesso negado
+
+Os logs incluem:
+- ID do usuário
+- Tipo de ação
+- Timestamp
+- IP de origem
+- Dados relevantes da ação
+
+===============================================================================
+                                CURL EXAMPLES
+===============================================================================
+
+1. LOGIN ADMIN:
+curl -X POST http://localhost:5000/api/auth/admin/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "admin@election-system.com",
+    "password": "admin123"
+  }'
+
+2. LISTAR ELEIÇÕES:
+curl -X GET http://localhost:5000/api/election \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json"
+
+3. CRIAR ELEIÇÃO:
+curl -X POST http://localhost:5000/api/election \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Nova Eleição",
+    "description": "Descrição da nova eleição",
+    "startDate": "2024-12-01T09:00:00",
+    "endDate": "2024-12-01T18:00:00"
+  }'
+
+4. ELEIÇÕES ATIVAS (PÚBLICO):
+curl -X GET http://localhost:5000/api/election/active
+
+===============================================================================
+                              HEALTH CHECK
+===============================================================================
+
+GET /health
+Resposta:
+{
+    "status": "Healthy",
+    "timestamp": "2024-01-01T10:00:00Z"
+}
+
+===============================================================================
+                                  SWAGGER UI
+===============================================================================
+
+Acesse http://localhost:5000/swagger para documentação interativa completa
+- Interface visual para testar todos os endpoints
+- Esquemas de dados detalhados
+- Exemplos de requisições e respostas
+- Autenticação JWT integrada
+
+===============================================================================
+                                    NOTAS
+===============================================================================
+
+1. Todos os timestamps seguem o formato ISO 8601 (YYYY-MM-DDTHH:mm:ss)
+2. Timezone padrão: America/Sao_Paulo
+3. Encoding: UTF-8
+4. Content-Type padrão: application/json
+5. Todas as senhas são criptografadas com BCrypt
+6. Logs estruturados com Serilog
+7. Middleware de CORS habilitado para desenvolvimento
+8. Rate limiting e outras medidas de segurança podem ser adicionadas
+
+===============================================================================
+                                  SUPPORT
+===============================================================================
+
+Para dúvidas, consulte:
+- Swagger UI: http://localhost:5000/swagger
+- Health Check: http://localhost:5000/health
+- API Info: http://localhost:5000/
+
+===============================================================================
