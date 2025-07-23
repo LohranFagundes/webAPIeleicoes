@@ -58,13 +58,22 @@ public class RequestLoggingMiddleware
         // Log request body for POST/PUT requests (be careful with sensitive data)
         if (request.Method == "POST" || request.Method == "PUT")
         {
-            request.EnableBuffering();
-            var body = await ReadStreamInChunks(request.Body);
-            request.Body.Position = 0;
-            
-            if (!string.IsNullOrEmpty(body) && !body.Contains("password", StringComparison.OrdinalIgnoreCase))
+            try
             {
-                _logger.LogInformation("Request Body: {Body}", body);
+                request.EnableBuffering();
+                
+                using var reader = new StreamReader(request.Body, Encoding.UTF8, false, 1024, true);
+                var body = await reader.ReadToEndAsync();
+                request.Body.Position = 0;
+                
+                if (!string.IsNullOrEmpty(body) && !body.Contains("password", StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogInformation("Request Body: {Body}", body);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("Could not read request body: {Error}", ex.Message);
             }
         }
     }
@@ -94,23 +103,4 @@ public class RequestLoggingMiddleware
         }
     }
 
-    private static async Task<string> ReadStreamInChunks(Stream stream)
-    {
-        const int readChunkBufferLength = 4096;
-        stream.Seek(0, SeekOrigin.Begin);
-        
-        using var textWriter = new StringWriter();
-        using var reader = new StreamReader(stream);
-        
-        var readChunk = new char[readChunkBufferLength];
-        int readChunkLength;
-        
-        do
-        {
-            readChunkLength = await reader.ReadBlockAsync(readChunk, 0, readChunkBufferLength);
-            textWriter.Write(readChunk, 0, readChunkLength);
-        } while (readChunkLength > 0);
-        
-        return textWriter.ToString();
-    }
 }

@@ -84,7 +84,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"email\": \"admin@election.com\",\n    \"password\": \"Admin123!\"\n}"
+							"raw": "{\n    \"email\": \"admin@election-system.com\",\n    \"password\": \"admin123\"\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/auth/admin/login",
@@ -141,17 +141,58 @@
 					}
 				},
 				{
-					"name": "Clear Tokens",
+					"name": "Logout",
 					"event": [
 						{
 							"listen": "test",
 							"script": {
 								"exec": [
-									"// Script para limpar tokens armazenados",
+									"// Script para limpar tokens após logout",
+									"if (pm.response.code === 200) {",
+									"    pm.globals.unset('authToken');",
+									"    pm.globals.unset('userId');",
+									"    pm.globals.unset('userRole');",
+									"    console.log('✅ Logout realizado com sucesso');",
+									"    console.log('🧹 Tokens removidos do ambiente');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/logout",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "auth", "logout"]
+						},
+						"description": "Logout do sistema"
+					}
+				},
+				{
+					"name": "Clear Tokens (Utility)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Utilitário para limpar tokens manualmente",
 									"pm.globals.unset('authToken');",
 									"pm.globals.unset('userId');",
 									"pm.globals.unset('userRole');",
-									"console.log('🧹 Tokens removidos do ambiente');"
+									"console.log('🧹 Tokens removidos manualmente');"
 								],
 								"type": "text/javascript"
 							}
@@ -165,7 +206,7 @@
 							"host": ["{{baseUrl}}"],
 							"path": ["health"]
 						},
-						"description": "Endpoint para limpar tokens armazenados"
+						"description": "Utilitário para limpar tokens manualmente"
 					}
 				}
 			],
@@ -285,57 +326,29 @@
 			]
 		},
 		{
-			"name": "🗳️ Secure Voting System",
+			"name": "⚡ Voting System",
 			"item": [
 				{
-					"name": "Voter Login (Voting Portal)",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"if (pm.response.code === 200) {",
-									"    const response = pm.response.json();",
-									"    if (response.data && response.data.token) {",
-									"        pm.globals.set('voterToken', response.data.token);",
-									"        pm.globals.set('voterId', response.data.voterId);",
-									"        console.log('✅ Login do eleitor realizado!');",
-									"        console.log('⏰ Token expira em 10 minutos');",
-									"    }",
-									"}"
-								]
-							}
-						}
-					],
+					"name": "Check Voting Eligibility",
 					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"cpf\": \"12345678901\",\n    \"password\": \"Voter123!\"\n}"
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
 						},
-						"url": {
-							"raw": "{{baseUrl}}/api/voting/login",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "voting", "login"]
-						}
-					}
-				},
-				{
-					"name": "Get Election Status",
-					"request": {
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/voting/election/1/status",
+							"raw": "{{baseUrl}}/api/voting/can-vote/1",
 							"host": ["{{baseUrl}}"],
-							"path": ["api", "voting", "election", "1", "status"]
-						}
+							"path": ["api", "voting", "can-vote", "1"]
+						},
+						"description": "Check if voter can vote in specific election"
 					}
 				},
 				{
@@ -346,7 +359,7 @@
 							"bearer": [
 								{
 									"key": "token",
-									"value": "{{voterToken}}",
+									"value": "{{authToken}}",
 									"type": "string"
 								}
 							]
@@ -360,83 +373,17 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"electionId\": 1,\n    \"positionId\": 1,\n    \"candidateId\": 1,\n    \"voteType\": \"candidate\",\n    \"justification\": \"\"\n}"
+							"raw": "{\n    \"electionId\": 1,\n    \"votes\": [\n        {\n            \"positionId\": 1,\n            \"candidateId\": 5,\n            \"voteType\": \"candidate\"\n        }\n    ]\n}"
 						},
 						"url": {
-							"raw": "{{baseUrl}}/api/voting/cast-vote",
+							"raw": "{{baseUrl}}/api/voting/cast",
 							"host": ["{{baseUrl}}"],
-							"path": ["api", "voting", "cast-vote"]
+							"path": ["api", "voting", "cast"]
 						}
 					}
 				},
 				{
-					"name": "Get Vote Receipt",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{voterToken}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{baseUrl}}/api/voting/receipt/RECEIPT_TOKEN_HERE",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "voting", "receipt", "RECEIPT_TOKEN_HERE"]
-						}
-					}
-				},
-				{
-					"name": "Seal Election (Admin)",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{authToken}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "POST",
-						"header": [],
-						"url": {
-							"raw": "{{baseUrl}}/api/voting/admin/seal-election/1",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "voting", "admin", "seal-election", "1"]
-						}
-					}
-				},
-				{
-					"name": "Generate Zero Report (Admin)",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{authToken}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "POST",
-						"header": [],
-						"url": {
-							"raw": "{{baseUrl}}/api/voting/admin/zero-report/1",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "voting", "admin", "zero-report", "1"]
-						}
-					}
-				},
-				{
-					"name": "Validate Election Integrity (Admin)",
+					"name": "Get Voting History (Voter Only)",
 					"request": {
 						"auth": {
 							"type": "bearer",
@@ -451,9 +398,30 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/voting/admin/validate-integrity/1",
+							"raw": "{{baseUrl}}/api/voting/history",
 							"host": ["{{baseUrl}}"],
-							"path": ["api", "voting", "admin", "validate-integrity", "1"]
+							"path": ["api", "voting", "history"]
+						}
+					}
+				},
+				{
+					"name": "Validate Vote Receipt (Public)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"receiptCode\": \"VR-ABC123-XYZ789\",\n    \"electionId\": 1\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/voting/validate-receipt",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "voting", "validate-receipt"]
 						}
 					}
 				}
@@ -556,7 +524,61 @@
 					}
 				},
 				{
-					"name": "Test Email Configuration",
+					"name": "Get Email History",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/email/history?page=1&limit=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "email", "history"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Email Status",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/email/status/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "email", "status", "1"]
+						}
+					}
+				},
+				{
+					"name": "Validate Email Configuration",
 					"request": {
 						"auth": {
 							"type": "bearer",
@@ -571,9 +593,9 @@
 						"method": "POST",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/email/test",
+							"raw": "{{baseUrl}}/api/email/validate-config",
 							"host": ["{{baseUrl}}"],
-							"path": ["api", "email", "test"]
+							"path": ["api", "email", "validate-config"]
 						}
 					}
 				}
@@ -663,7 +685,87 @@
 					}
 				},
 				{
-					"name": "Export Audit Data",
+					"name": "Get Specific Audit Log",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/report/audit-logs/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "report", "audit-logs", "1"]
+						}
+					}
+				},
+				{
+					"name": "Export Audit Report",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/report/audit-export?format=csv&startDate=2024-01-01&endDate=2024-12-31",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "report", "audit-export"],
+							"query": [
+								{
+									"key": "format",
+									"value": "csv"
+								},
+								{
+									"key": "startDate",
+									"value": "2024-01-01"
+								},
+								{
+									"key": "endDate",
+									"value": "2024-12-31"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Real-time Activity",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/report/real-time",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "report", "real-time"]
+						}
+					}
+				},
+				{
+					"name": "Cleanup Old Logs",
 					"request": {
 						"auth": {
 							"type": "bearer",
@@ -684,22 +786,22 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"format\": \"csv\",\n    \"includeDetails\": true,\n    \"startDate\": \"2024-01-01T00:00:00Z\",\n    \"endDate\": \"2024-12-31T23:59:59Z\"\n}"
+							"raw": "{\n    \"daysToKeep\": 90\n}"
 						},
 						"url": {
-							"raw": "{{baseUrl}}/api/report/export",
+							"raw": "{{baseUrl}}/api/report/cleanup-old-logs",
 							"host": ["{{baseUrl}}"],
-							"path": ["api", "report", "export"]
+							"path": ["api", "report", "cleanup-old-logs"]
 						}
 					}
 				}
 			]
 		},
 		{
-			"name": "👥 Users Management",
+			"name": "👤 Voter Management",
 			"item": [
 				{
-					"name": "Get All Voters",
+					"name": "List Voters (Admin Only)",
 					"request": {
 						"auth": {
 							"type": "bearer",
@@ -713,6 +815,125 @@
 						},
 						"method": "GET",
 						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/voter?page=1&limit=10&isActive=true&isVerified=true&search=john",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "voter"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								},
+								{
+									"key": "isActive",
+									"value": "true"
+								},
+								{
+									"key": "isVerified",
+									"value": "true"
+								},
+								{
+									"key": "search",
+									"value": "john"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Voter Details (Admin Only)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/voter/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "voter", "1"]
+						}
+					}
+				},
+				{
+					"name": "Get Voter Profile (Voter Only)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/voter/profile",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "voter", "profile"]
+						}
+					}
+				},
+				{
+					"name": "Get Voter Statistics (Admin Only)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/voter/statistics",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "voter", "statistics"]
+						}
+					}
+				},
+				{
+					"name": "Create Voter (Admin Only)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"João Silva\",\n    \"email\": \"joao@example.com\",\n    \"cpf\": \"12345678901\",\n    \"password\": \"securepassword\",\n    \"voteWeight\": 1.0,\n    \"isActive\": true\n}"
+						},
 						"url": {
 							"raw": "{{baseUrl}}/api/voter",
 							"host": ["{{baseUrl}}"],
@@ -721,7 +942,134 @@
 					}
 				},
 				{
-					"name": "Create Voter",
+					"name": "Update Voter (Admin Only)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"João Silva Santos\",\n    \"email\": \"joao.silva@example.com\",\n    \"cpf\": \"12345678901\",\n    \"voteWeight\": 1.0,\n    \"isActive\": true\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/voter/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "voter", "1"]
+						}
+					}
+				},
+				{
+					"name": "Update Voter Profile (Voter Only)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"João Silva Santos\",\n    \"email\": \"joao.silva@example.com\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/voter/profile",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "voter", "profile"]
+						}
+					}
+				},
+				{
+					"name": "Delete Voter (Admin Only)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/voter/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "voter", "1"]
+						}
+					}
+				},
+				{
+					"name": "Verify Email (Public)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"voter@example.com\",\n    \"verificationCode\": \"ABC123\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/voter/verify-email",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "voter", "verify-email"]
+						}
+					}
+				},
+				{
+					"name": "Send Verification Email (Admin Only)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/voter/1/send-verification",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "voter", "1", "send-verification"]
+						}
+					}
+				},
+				{
+					"name": "Change Password (Voter Only)",
 					"request": {
 						"auth": {
 							"type": "bearer",
@@ -742,34 +1090,43 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"name\": \"João Silva\",\n    \"email\": \"joao@example.com\",\n    \"cpf\": \"12345678901\",\n    \"password\": \"Voter123!\",\n    \"birthDate\": \"1990-01-01\",\n    \"phone\": \"11999999999\"\n}"
+							"raw": "{\n    \"currentPassword\": \"oldpassword\",\n    \"newPassword\": \"newpassword\"\n}"
 						},
 						"url": {
-							"raw": "{{baseUrl}}/api/voter",
+							"raw": "{{baseUrl}}/api/voter/change-password",
 							"host": ["{{baseUrl}}"],
-							"path": ["api", "voter"]
+							"path": ["api", "voter", "change-password"]
+						}
+					}
+				},
+				{
+					"name": "Reset Password (Public)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"voter@example.com\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/voter/reset-password",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "voter", "reset-password"]
 						}
 					}
 				}
 			]
 		},
 		{
-			"name": "🏛️ Positions & Candidates",
+			"name": "👥 Candidate Management (Admin Only)",
 			"item": [
 				{
-					"name": "Get All Positions",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{baseUrl}}/api/position",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "position"]
-						}
-					}
-				},
-				{
-					"name": "Create Position",
+					"name": "List Candidates",
 					"request": {
 						"auth": {
 							"type": "bearer",
@@ -781,33 +1138,86 @@
 								}
 							]
 						},
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"name\": \"Prefeito\",\n    \"description\": \"Cargo de prefeito municipal\",\n    \"electionId\": 1,\n    \"maxCandidates\": 1,\n    \"isActive\": true\n}"
-						},
+						"method": "GET",
+						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/position",
+							"raw": "{{baseUrl}}/api/candidate?page=1&limit=10&positionId=1&search=maria",
 							"host": ["{{baseUrl}}"],
-							"path": ["api", "position"]
+							"path": ["api", "candidate"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								},
+								{
+									"key": "positionId",
+									"value": "1"
+								},
+								{
+									"key": "search",
+									"value": "maria"
+								}
+							]
 						}
 					}
 				},
 				{
-					"name": "Get All Candidates",
+					"name": "Get Candidate Details",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/candidate/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "candidate", "1"]
+						}
+					}
+				},
+				{
+					"name": "Get Candidates by Position (Public)",
 					"request": {
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/candidate",
+							"raw": "{{baseUrl}}/api/candidate/position/1",
 							"host": ["{{baseUrl}}"],
-							"path": ["api", "candidate"]
+							"path": ["api", "candidate", "position", "1"]
+						}
+					}
+				},
+				{
+					"name": "Get Candidates with Vote Counts",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/candidate/position/1/with-votes",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "candidate", "position", "1", "with-votes"]
 						}
 					}
 				},
@@ -833,12 +1243,345 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"name\": \"João da Silva\",\n    \"number\": \"12\",\n    \"party\": \"Partido ABC\",\n    \"positionId\": 1,\n    \"isActive\": true\n}"
+							"raw": "{\n    \"name\": \"Maria Santos\",\n    \"number\": \"10\",\n    \"description\": \"Candidata com experiência em gestão\",\n    \"biography\": \"Maria Santos tem 15 anos de experiência em liderança e gestão.\",\n    \"positionId\": 1,\n    \"orderPosition\": 1,\n    \"isActive\": true\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/api/candidate",
 							"host": ["{{baseUrl}}"],
 							"path": ["api", "candidate"]
+						}
+					}
+				},
+				{
+					"name": "Update Candidate",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Maria Santos Silva\",\n    \"number\": \"10\",\n    \"description\": \"Candidata com vasta experiência em gestão\",\n    \"biography\": \"Maria Santos tem 15 anos de experiência em liderança e gestão corporativa.\",\n    \"positionId\": 1,\n    \"orderPosition\": 1,\n    \"isActive\": true\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/candidate/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "candidate", "1"]
+						}
+					}
+				},
+				{
+					"name": "Delete Candidate",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/candidate/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "candidate", "1"]
+						}
+					}
+				},
+				{
+					"name": "Upload Candidate Photo",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "photo",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/candidate/1/upload-photo",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "candidate", "1", "upload-photo"]
+						},
+						"description": "Upload photo for candidate (max 5MB, JPG/PNG/GIF)"
+					}
+				},
+				{
+					"name": "Reorder Candidates",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"candidateOrders\": [\n        { \"candidateId\": 1, \"orderPosition\": 1 },\n        { \"candidateId\": 2, \"orderPosition\": 2 }\n    ]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/candidate/position/1/reorder",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "candidate", "position", "1", "reorder"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "📋 Position Management (Admin Only)",
+			"item": [
+				{
+					"name": "List Positions",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/position?page=1&limit=10&electionId=1&search=president",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "position"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								},
+								{
+									"key": "electionId",
+									"value": "1"
+								},
+								{
+									"key": "search",
+									"value": "president"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Position Details",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/position/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "position", "1"]
+						}
+					}
+				},
+				{
+					"name": "Get Position with Candidates",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/position/1/with-candidates",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "position", "1", "with-candidates"]
+						}
+					}
+				},
+				{
+					"name": "Get Positions by Election (Public)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/position/election/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "position", "election", "1"]
+						}
+					}
+				},
+				{
+					"name": "Create Position",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"title\": \"President\",\n    \"description\": \"Chief executive position\",\n    \"electionId\": 1,\n    \"maxCandidates\": 10,\n    \"maxVotesPerVoter\": 1,\n    \"orderPosition\": 1,\n    \"isActive\": true\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/position",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "position"]
+						}
+					}
+				},
+				{
+					"name": "Update Position",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"title\": \"President - Updated\",\n    \"description\": \"Chief executive position - Updated description\",\n    \"electionId\": 1,\n    \"maxCandidates\": 10,\n    \"maxVotesPerVoter\": 1,\n    \"orderPosition\": 1,\n    \"isActive\": true\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/position/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "position", "1"]
+						}
+					}
+				},
+				{
+					"name": "Delete Position",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/position/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "position", "1"]
+						}
+					}
+				},
+				{
+					"name": "Reorder Positions",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"positionOrders\": [\n        { \"positionId\": 1, \"orderPosition\": 1 },\n        { \"positionId\": 2, \"orderPosition\": 2 }\n    ]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/position/election/1/reorder",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "position", "election", "1", "reorder"]
 						}
 					}
 				}

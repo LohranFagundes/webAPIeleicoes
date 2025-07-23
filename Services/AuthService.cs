@@ -46,8 +46,12 @@ public class AuthService : IAuthService
 
     public async Task<string> GenerateJwtTokenAsync(int userId, string role)
     {
-        var jwtSettings = _configuration.GetSection("JwtSettings");
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["SecretKey"]!));
+        // Use same configuration priority as Program.cs (environment variables first)
+        var jwtSecretKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY") ?? _configuration["JwtSettings:SecretKey"]!;
+        var jwtIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER") ?? _configuration["JwtSettings:Issuer"]!;
+        var jwtAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? _configuration["JwtSettings:Audience"]!;
+        
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecretKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
         var expireMinutes = role == "admin" ? 59 : 10; // Admin: 59 minutes, Voter: 10 minutes
@@ -64,8 +68,8 @@ public class AuthService : IAuthService
         };
 
         var token = new JwtSecurityToken(
-            issuer: jwtSettings["Issuer"],
-            audience: jwtSettings["Audience"],
+            issuer: jwtIssuer,
+            audience: jwtAudience,
             claims: claims,
             expires: expiry,
             signingCredentials: credentials
@@ -78,8 +82,12 @@ public class AuthService : IAuthService
     {
         try
         {
-            var jwtSettings = _configuration.GetSection("JwtSettings");
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["SecretKey"]!));
+            // Use same configuration priority as Program.cs (environment variables first)
+            var jwtSecretKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY") ?? _configuration["JwtSettings:SecretKey"]!;
+            var jwtIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER") ?? _configuration["JwtSettings:Issuer"]!;
+            var jwtAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? _configuration["JwtSettings:Audience"]!;
+            
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecretKey));
 
             var tokenHandler = new JwtSecurityTokenHandler();
             var validationParameters = new TokenValidationParameters
@@ -87,9 +95,9 @@ public class AuthService : IAuthService
                 ValidateIssuerSigningKey = true,
                 IssuerSigningKey = key,
                 ValidateIssuer = true,
-                ValidIssuer = jwtSettings["Issuer"],
+                ValidIssuer = jwtIssuer,
                 ValidateAudience = true,
-                ValidAudience = jwtSettings["Audience"],
+                ValidAudience = jwtAudience,
                 ValidateLifetime = true,
                 ClockSkew = TimeSpan.Zero
             };

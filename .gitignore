@@ -358,3 +358,37 @@ Generated/
 
 # Custom project ignores
 database-connection.rtf
+
+# Docker
+docker-compose.override.yml
+.dockerignore
+
+# Docker volumes and containers
+mysql_data/
+
+# Environment configuration
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# Sensitive configuration files
+appsettings.Production.json
+appsettings.Staging.json
+
+# IDE files
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Application logs
+logs/
+*.log
+
+# Runtime files
+bin/
+obj/

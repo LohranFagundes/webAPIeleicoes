@@ -34,7 +34,11 @@ builder.Services.AddHttpContextAccessor();
 // Database Configuration
 var connectionString = BuildConnectionString();
 builder.Services.AddDbContext<ElectionDbContext>(options =>
-    options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+    options.UseMySql(connectionString, new MySqlServerVersion(new Version(8, 0, 21)), 
+        mySqlOptions => mySqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 5,
+            maxRetryDelay: TimeSpan.FromSeconds(30),
+            errorNumbersToAdd: null)));
 
 // Repository Pattern
 builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
@@ -167,15 +171,29 @@ try
 {
     Log.Information("Starting Election API");
     
-    // Seed the database
-    using (var scope = app.Services.CreateScope())
+    // Seed the database in the background
+    _ = Task.Run(async () =>
     {
-        var context = scope.ServiceProvider.GetRequiredService<ElectionDbContext>();
-        var authService = scope.ServiceProvider.GetRequiredService<IAuthService>();
-        await DataSeeder.SeedAsync(context, authService);
-        Log.Information("Database seeding completed");
-    }
+        try
+        {
+            // Wait for app to start
+            await Task.Delay(2000);
+            
+            using (var scope = app.Services.CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<ElectionDbContext>();
+                var authService = scope.ServiceProvider.GetRequiredService<IAuthService>();
+                await DataSeeder.SeedAsync(context, authService);
+                Log.Information("Database seeding completed");
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Error during database seeding");
+        }
+    });
     
+    // Start the application (this blocks until shutdown)
     app.Run();
 }
 catch (Exception ex)
