@@ -359,11 +359,11 @@ Generated/
 # Custom project ignores
 database-connection.rtf
 
-# Docker
+# Docker (keep Dockerfile and docker-compose.yml in git)
 docker-compose.override.yml
 .dockerignore
 
-# Docker volumes and containers
+# Docker volumes and data (ignore runtime data only)
 mysql_data/
 
 # Environment configuration
@@ -385,9 +385,17 @@ appsettings.Staging.json
 *.tmp
 *.temp
 
-# Application logs
+# Application logs (keep API documentation files)
 logs/
 *.log
+
+# Keep important documentation and configuration files
+!README.md
+!API-DOCUMENTATION.txt
+!SETUP.md
+!.env.example
+!Dockerfile
+!docker-compose.yml
 
 # Runtime files
 bin/
