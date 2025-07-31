@@ -396,6 +396,14 @@ logs/
 !Dockerfile
 !docker-compose.yml
 
+# Environment files with sensitive data
+.env
+.env.local
+.env.production
+.env.staging
+*.env
+!.env.example
+
 # Documentation files - keep out of repository
 README-DEV.md
 GUIA-TECNICO-INICIANTES.md

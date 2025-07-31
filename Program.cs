@@ -33,12 +33,15 @@ builder.Services.AddHttpContextAccessor();
 
 // Database Configuration
 var connectionString = BuildConnectionString();
-builder.Services.AddDbContext<ElectionDbContext>(options =>
-    options.UseMySql(connectionString, new MySqlServerVersion(new Version(8, 0, 21)), 
+builder.Services.AddDbContext<ElectionDbContext>((serviceProvider, options) =>
+{
+    var connectionString = BuildConnectionString();
+    options.UseMySql(connectionString, new MySqlServerVersion(new Version(8, 0, 21)),
         mySqlOptions => mySqlOptions.EnableRetryOnFailure(
             maxRetryCount: 5,
             maxRetryDelay: TimeSpan.FromSeconds(30),
-            errorNumbersToAdd: null)));
+            errorNumbersToAdd: null));
+});
 
 // Repository Pattern
 builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
@@ -128,6 +131,7 @@ app.UseMiddleware<CorsMiddleware>();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseMiddleware<RequestLoggingMiddleware>();
 app.UseMiddleware<AuditLoggingMiddleware>();
+
 app.UseMiddleware<SwaggerAuthMiddleware>();
 
 // Only use HTTPS redirection in production
@@ -154,7 +158,7 @@ app.MapGet("/docs", () => Results.Redirect("/swagger"));
 app.MapGet("/", () => Results.Ok(new 
 { 
     Name = "Election API .NET", 
-    Version = "1.0.0", 
+    Version = "1.1.0", 
     Environment = app.Environment.EnvironmentName,
     Documentation = "/swagger",
     Endpoints = new

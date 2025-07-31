@@ -1,3 +1,4 @@
+
 using System.Security.Claims;
 using System.Text;
 using ElectionApi.Net.Services;
@@ -87,12 +88,12 @@ public class AuditLoggingMiddleware
             var entityInfo = ExtractEntityInfo(context);
 
             var details = $"{{" +
-                         $"\"method\": \"{context.Request.Method}\", " +
-                         $"\"path\": \"{context.Request.Path}\", " +
-                         $"\"queryString\": \"{context.Request.QueryString}\", " +
-                         $"\"statusCode\": {statusCode}, " +
-                         $"\"duration\": \"{duration.TotalMilliseconds}ms\", " +
-                         $"\"userAgent\": \"{context.Request.Headers["User-Agent"].FirstOrDefault()}\"" +
+                         $""method": "{context.Request.Method}", " +
+                         $""path": "{context.Request.Path}", " +
+                         $""queryString": "{context.Request.QueryString}", " +
+                         $""statusCode": {statusCode}, " +
+                         $""duration": "{duration.TotalMilliseconds}ms", " +
+                         $""userAgent": "{context.Request.Headers["User-Agent"].FirstOrDefault()}"" +
                          $"}}";
 
             if (ShouldLogRequest(context.Request.Method, statusCode))
@@ -114,11 +115,11 @@ public class AuditLoggingMiddleware
             var userType = GetCurrentUserType(context);
 
             var details = $"{{" +
-                         $"\"method\": \"{context.Request.Method}\", " +
-                         $"\"path\": \"{context.Request.Path}\", " +
-                         $"\"error\": \"{ex.Message}\", " +
-                         $"\"exception\": \"{ex.GetType().Name}\", " +
-                         $"\"duration\": \"{duration.TotalMilliseconds}ms\"" +
+                         $""method": "{context.Request.Method}", " +
+                         $""path": "{context.Request.Path}", " +
+                         $""error": "{ex.Message}", " +
+                         $""exception": "{ex.GetType().Name}", " +
+                         $""duration": "{duration.TotalMilliseconds}ms"" +
                          $"}}";
 
             await auditService.LogAsync(userId, userType, "error", "api_request", null, details);
@@ -149,11 +150,22 @@ public class AuditLoggingMiddleware
         };
     }
 
-    private string DetermineAction(HttpContext context, int statusCode)
+        private string DetermineAction(HttpContext context, int statusCode)
     {
         var method = context.Request.Method.ToUpper();
+        var path = context.Request.Path.Value?.ToLower() ?? "";
         var isSuccess = statusCode >= 200 && statusCode < 400;
-        
+
+        if (path.Contains("login"))
+        {
+            return isSuccess ? "login_success" : "login_failed";
+        }
+
+        if (path.Contains("logout"))
+        {
+            return isSuccess ? "logout_success" : "logout_failed";
+        }
+
         return method switch
         {
             "GET" => isSuccess ? "api_read" : "api_read_failed",
@@ -194,23 +206,8 @@ public class AuditLoggingMiddleware
         return (entityType, null);
     }
 
-    private bool ShouldLogRequest(string method, int statusCode)
+        private bool ShouldLogRequest(string method, int statusCode)
     {
-        // Log all POST, PUT, PATCH, DELETE requests
-        if (method is "POST" or "PUT" or "PATCH" or "DELETE")
-            return true;
-
-        // Log GET requests that failed
-        if (method == "GET" && statusCode >= 400)
-            return true;
-
-        // Log successful GET requests to sensitive endpoints
-        if (method == "GET" && statusCode < 400)
-        {
-            // You can customize this logic based on your needs
-            return true; // For now, log all successful GET requests too
-        }
-
-        return false;
+        return true;
     }
 }

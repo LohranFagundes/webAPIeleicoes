@@ -38,7 +38,7 @@ public class LogService : ILogService
             query = query.Where(l => l.UserType == filter.UserType);
 
         if (!string.IsNullOrEmpty(filter.Action))
-            query = query.Where(l => l.Action == filter.Action);
+            query = query.Where(l => l.Action.Contains(filter.Action));
 
         if (!string.IsNullOrEmpty(filter.EntityType))
             query = query.Where(l => l.EntityType == filter.EntityType);
