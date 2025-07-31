@@ -1,7 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using ElectionApi.Net.DTOs;
 using ElectionApi.Net.Services;
+using ElectionApi.Net.Data;
+using ElectionApi.Net.Models;
 using System.Security.Claims;
 
 namespace ElectionApi.Net.Controllers;
@@ -39,6 +42,43 @@ public class ReportController : ControllerBase
         catch (Exception ex)
         {
             return StatusCode(500, ApiResponse<object>.ErrorResult($"Failed to fetch audit logs: {ex.Message}"));
+        }
+    }
+
+    [HttpGet("debug-audit-logs")]
+    public async Task<IActionResult> DebugAuditLogs()
+    {
+        try
+        {
+            // Test 1: Check direct repository access
+            var auditRepository = HttpContext.RequestServices.GetService<IRepository<AuditLog>>();
+            if (auditRepository == null)
+                return BadRequest("AuditLog repository not found in DI container");
+
+            // Test 2: Check total count directly
+            var totalCount = await auditRepository.CountAsync();
+            
+            // Test 3: Get first 10 records directly
+            var directLogs = await auditRepository.GetQueryable().Take(10).ToListAsync();
+            
+            // Test 4: Check if LogService is working
+            var filter = new AuditLogFilterDto { Page = 1, Limit = 10 };
+            var serviceResult = await _logService.GetLogsAsync(filter);
+            
+            return Ok(new {
+                TotalCountDirect = totalCount,
+                DirectLogsCount = directLogs.Count,
+                DirectLogs = directLogs.Select(l => new {
+                    l.Id, l.UserId, l.UserType, l.Action, l.EntityType, l.LoggedAt
+                }),
+                ServiceResultCount = serviceResult.TotalItems,
+                ServiceItems = serviceResult.Items.Count(),
+                FilterUsed = filter
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, ApiResponse<object>.ErrorResult($"Debug failed: {ex.Message}\n\nStackTrace: {ex.StackTrace}"));
         }
     }
 
