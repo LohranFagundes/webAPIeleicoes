@@ -391,11 +391,15 @@ logs/
 
 # Keep important documentation and configuration files
 !README.md
-!API-DOCUMENTATION.txt
 !SETUP.md
 !.env.example
 !Dockerfile
 !docker-compose.yml
+
+# Documentation files - keep out of repository
+README-DEV.md
+GUIA-TECNICO-INICIANTES.md
+API-DOCUMENTATION.txt
 
 # Runtime files
 bin/
