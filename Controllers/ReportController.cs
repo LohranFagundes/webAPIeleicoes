@@ -45,63 +45,73 @@ public class ReportController : ControllerBase
         }
     }
 
+    [HttpGet("debug-test")]
+    public IActionResult DebugTest()
+    {
+        return Ok(new { 
+            message = "Debug endpoint is working!", 
+            timestamp = DateTime.UtcNow,
+            version = "1.1.1"
+        });
+    }
+
     [HttpGet("debug-audit-logs")]
     public async Task<IActionResult> DebugAuditLogs()
     {
         try
         {
-            // Test 1: Check direct repository access
+            // Test 1: Check if LogService is available
+            if (_logService == null)
+                return BadRequest("LogService is null");
+                
+            if (_auditService == null)
+                return BadRequest("AuditService is null");
+
+            // Test 2: Try simple filter first
+            var simpleFilter = new AuditLogFilterDto { Page = 1, Limit = 5 };
+            var simpleResult = await _logService.GetLogsAsync(simpleFilter);
+
+            // Test 3: Check direct repository access
             var auditRepository = HttpContext.RequestServices.GetService<IRepository<AuditLog>>();
             if (auditRepository == null)
                 return BadRequest("AuditLog repository not found in DI container");
 
-            // Test 2: Check total count directly
+            // Test 4: Check total count directly
             var totalCount = await auditRepository.CountAsync();
             
-            // Test 3: Get first 10 records directly
-            var directLogs = await auditRepository.GetQueryable().Take(10).ToListAsync();
+            // Test 5: Get first 5 records directly
+            var directLogs = await auditRepository.GetQueryable().Take(5).ToListAsync();
             
-            // Test 4: Check if LogService is working
-            var filter = new AuditLogFilterDto { Page = 1, Limit = 10 };
-            var serviceResult = await _logService.GetLogsAsync(filter);
-            
-            // Test 5: Check login-specific logs
-            var loginLogs = await auditRepository.GetQueryable()
-                .Where(l => l.Action.Contains("login"))
-                .Take(10)
-                .ToListAsync();
-            
-            // Test 6: Check all distinct actions
-            var allActions = await auditRepository.GetQueryable()
-                .Select(l => l.Action)
-                .Distinct()
-                .ToListAsync();
-                
-            // Test 7: Try the exact same filter as the failing endpoint
+            // Test 6: Try login filter with service
             var loginFilter = new AuditLogFilterDto { 
                 Page = 1, 
-                Limit = 50, 
+                Limit = 10, 
                 Action = "login" 
             };
             var loginServiceResult = await _logService.GetLogsAsync(loginFilter);
             
             return Ok(new {
-                TotalCountDirect = totalCount,
-                DirectLogsCount = directLogs.Count,
-                DirectLogs = directLogs.Select(l => new {
-                    l.Id, l.UserId, l.UserType, l.Action, l.EntityType, l.LoggedAt
-                }),
-                LoginLogsCount = loginLogs.Count,
-                LoginLogs = loginLogs.Select(l => new {
-                    l.Id, l.Action, l.UserType, l.LoggedAt
-                }),
-                AllActions = allActions,
-                ServiceResultCount = serviceResult.TotalItems,
-                ServiceItems = serviceResult.Items.Count(),
-                LoginServiceResultCount = loginServiceResult.TotalItems,
-                LoginServiceItems = loginServiceResult.Items.Count(),
-                FilterUsed = filter,
-                LoginFilterUsed = loginFilter
+                message = "Debug audit logs working",
+                timestamp = DateTime.UtcNow,
+                tests = new {
+                    totalCountDirect = totalCount,
+                    directLogsCount = directLogs.Count,
+                    directLogs = directLogs.Select(l => new {
+                        l.Id, l.UserId, l.UserType, l.Action, l.EntityType, l.LoggedAt
+                    }),
+                    simpleServiceResult = new {
+                        totalItems = simpleResult.TotalItems,
+                        itemsCount = simpleResult.Items.Count()
+                    },
+                    loginServiceResult = new {
+                        totalItems = loginServiceResult.TotalItems,
+                        itemsCount = loginServiceResult.Items.Count()
+                    },
+                    filtersUsed = new {
+                        simple = simpleFilter,
+                        login = loginFilter
+                    }
+                }
             });
         }
         catch (Exception ex)
