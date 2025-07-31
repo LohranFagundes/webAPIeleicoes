@@ -88,12 +88,12 @@ public class AuditLoggingMiddleware
             var entityInfo = ExtractEntityInfo(context);
 
             var details = $"{{" +
-                         $""method": "{context.Request.Method}", " +
-                         $""path": "{context.Request.Path}", " +
-                         $""queryString": "{context.Request.QueryString}", " +
-                         $""statusCode": {statusCode}, " +
-                         $""duration": "{duration.TotalMilliseconds}ms", " +
-                         $""userAgent": "{context.Request.Headers["User-Agent"].FirstOrDefault()}"" +
+                         $"\"method\": \"{context.Request.Method}\", " +
+                         $"\"path\": \"{context.Request.Path}\", " +
+                         $"\"queryString\": \"{context.Request.QueryString}\", " +
+                         $"\"statusCode\": {statusCode}, " +
+                         $"\"duration\": \"{duration.TotalMilliseconds}ms\", " +
+                         $"\"userAgent\": \"{context.Request.Headers["User-Agent"].FirstOrDefault()}\"" +
                          $"}}";
 
             if (ShouldLogRequest(context.Request.Method, statusCode))
@@ -115,11 +115,11 @@ public class AuditLoggingMiddleware
             var userType = GetCurrentUserType(context);
 
             var details = $"{{" +
-                         $""method": "{context.Request.Method}", " +
-                         $""path": "{context.Request.Path}", " +
-                         $""error": "{ex.Message}", " +
-                         $""exception": "{ex.GetType().Name}", " +
-                         $""duration": "{duration.TotalMilliseconds}ms"" +
+                         $"\"method\": \"{context.Request.Method}\", " +
+                         $"\"path\": \"{context.Request.Path}\", " +
+                         $"\"error\": \"{ex.Message}\", " +
+                         $"\"exception\": \"{ex.GetType().Name}\", " +
+                         $"\"duration\": \"{duration.TotalMilliseconds}ms\"" +
                          $"}}";
 
             await auditService.LogAsync(userId, userType, "error", "api_request", null, details);
