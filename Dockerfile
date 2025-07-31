@@ -2,7 +2,7 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 
 # Add a build argument for the version
-ARG APP_VERSION=1.1.0
+ARG APP_VERSION=1.1.1
 
 WORKDIR /app
 
@@ -28,7 +28,7 @@ RUN echo "Build completed with EF tools available"
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
 
 # Add a build argument for the version
-ARG APP_VERSION=1.1.0
+ARG APP_VERSION=1.1.1
 
 WORKDIR /app
 

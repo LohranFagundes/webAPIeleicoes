@@ -1,5 +1,5 @@
 # 🔒 Election API - Security Guide
-**Version 1.1.0 - Hybrid Photo System**
+**Version 1.1.1 - Hybrid Photo System + Debug Tools**
 
 ## 🚨 Important Security Notice
 
@@ -61,7 +61,7 @@ docker-compose up -d
 | `docker-compose.yml` | ✅ Seguro | Usa variáveis de ambiente |
 | `appsettings.json` | ✅ Seguro | Sem senhas hardcoded |
 
-## 🛡️ Recursos de Segurança v1.1.0
+## 🛡️ Recursos de Segurança v1.1.1
 
 ### Sistema Híbrido de Fotos:
 - **Otimização ImageSharp**: Redimensionamento automático
