@@ -65,6 +65,14 @@ public class CandidateService : ICandidateService
         return candidate != null ? MapToResponseDto(candidate) : null;
     }
 
+    public async Task<Candidate?> GetCandidateModelByIdAsync(int id)
+    {
+        return await _candidateRepository.GetQueryable()
+            .Include(c => c.Position)
+            .Include(c => c.Votes)
+            .FirstOrDefaultAsync(c => c.Id == id);
+    }
+
     public async Task<CandidateResponseDto> CreateCandidateAsync(CreateCandidateDto createDto, int createdBy)
     {
         var position = await _positionRepository.GetByIdAsync(createDto.PositionId);
@@ -117,6 +125,16 @@ public class CandidateService : ICandidateService
 
         if (updateDto.PhotoUrl != null)
             candidate.PhotoUrl = updateDto.PhotoUrl;
+
+        // BLOB Photo Support - Sistema Híbrido
+        if (updateDto.PhotoData != null)
+            candidate.PhotoData = updateDto.PhotoData;
+
+        if (updateDto.PhotoMimeType != null)
+            candidate.PhotoMimeType = updateDto.PhotoMimeType;
+
+        if (updateDto.PhotoFileName != null)
+            candidate.PhotoFileName = updateDto.PhotoFileName;
 
         if (updateDto.OrderPosition.HasValue)
             candidate.OrderPosition = updateDto.OrderPosition.Value;
@@ -198,6 +216,17 @@ public class CandidateService : ICandidateService
 
     private static CandidateResponseDto MapToResponseDto(Candidate candidate)
     {
+        // Determine photo storage type
+        var hasPhotoFile = candidate.HasPhotoFile;
+        var hasPhotoBlob = candidate.HasPhotoBlob;
+        var photoStorageType = (hasPhotoFile, hasPhotoBlob) switch
+        {
+            (true, true) => "both",
+            (true, false) => "file",
+            (false, true) => "blob",
+            (false, false) => "none"
+        };
+
         return new CandidateResponseDto
         {
             Id = candidate.Id,
@@ -206,6 +235,15 @@ public class CandidateService : ICandidateService
             Description = candidate.Description,
             Biography = candidate.Biography,
             PhotoUrl = candidate.PhotoUrl,
+            
+            // Hybrid Photo Storage Information
+            HasPhoto = candidate.HasPhoto,
+            HasPhotoFile = hasPhotoFile,
+            HasPhotoBlob = hasPhotoBlob,
+            PhotoStorageType = photoStorageType,
+            PhotoMimeType = candidate.PhotoMimeType,
+            PhotoFileName = candidate.PhotoFileName,
+            
             OrderPosition = candidate.OrderPosition,
             IsActive = candidate.IsActive,
             PositionId = candidate.PositionId,

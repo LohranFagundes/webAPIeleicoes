@@ -21,6 +21,20 @@ public class Candidate : BaseEntity
     [StringLength(255)]
     public string? PhotoUrl { get; set; }
 
+    // BLOB Photo Storage - Sistema Híbrido
+    public byte[]? PhotoData { get; set; }
+    
+    [StringLength(100)]
+    public string? PhotoMimeType { get; set; }
+    
+    [StringLength(255)]
+    public string? PhotoFileName { get; set; }
+    
+    // Propriedades calculadas para facilitar uso
+    public bool HasPhotoFile => !string.IsNullOrEmpty(PhotoUrl);
+    public bool HasPhotoBlob => PhotoData?.Length > 0;
+    public bool HasPhoto => HasPhotoFile || HasPhotoBlob;
+
     public int OrderPosition { get; set; } = 1;
 
     public bool IsActive { get; set; } = true;

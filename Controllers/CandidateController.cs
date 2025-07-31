@@ -3,6 +3,9 @@ using Microsoft.AspNetCore.Mvc;
 using ElectionApi.Net.DTOs;
 using ElectionApi.Net.Services;
 using System.Security.Claims;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Processing;
+using SixLabors.ImageSharp.Formats.Jpeg;
 
 namespace ElectionApi.Net.Controllers;
 
@@ -265,6 +268,215 @@ public class CandidateController : ControllerBase
         }
     }
 
+    [HttpPost("{id}/upload-photo-blob")]
+    [Authorize(Roles = "admin")]
+    public async Task<IActionResult> UploadCandidatePhotoBlob(int id, IFormFile photo)
+    {
+        try
+        {
+            if (photo == null || photo.Length == 0)
+            {
+                return BadRequest(ApiResponse<object>.ErrorResult("No photo file provided"));
+            }
+
+            // Validate file type
+            var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+            var fileExtension = Path.GetExtension(photo.FileName).ToLowerInvariant();
+            
+            if (!allowedExtensions.Contains(fileExtension))
+            {
+                return BadRequest(ApiResponse<object>.ErrorResult("Invalid file type. Only JPG, PNG, GIF and WebP are allowed"));
+            }
+
+            // Validate file size (max 10MB for BLOB)
+            if (photo.Length > 10 * 1024 * 1024)
+            {
+                return BadRequest(ApiResponse<object>.ErrorResult("File size too large. Maximum size is 10MB"));
+            }
+
+            // Check if candidate exists
+            var candidate = await _candidateService.GetCandidateByIdAsync(id);
+            if (candidate == null)
+            {
+                return NotFound(ApiResponse<object>.ErrorResult("Candidate not found"));
+            }
+
+            // Process and optimize image using ImageSharp
+            byte[] optimizedImageData;
+            string finalMimeType;
+            
+            using var inputStream = photo.OpenReadStream();
+            using var image = await Image.LoadAsync(inputStream);
+            
+            // Resize if image is too large (max 800x600 for profile photos)
+            if (image.Width > 800 || image.Height > 600)
+            {
+                var targetWidth = Math.Min(800, image.Width);
+                var targetHeight = Math.Min(600, image.Height);
+                
+                // Maintain aspect ratio
+                var ratio = Math.Min((double)targetWidth / image.Width, (double)targetHeight / image.Height);
+                var newWidth = (int)(image.Width * ratio);
+                var newHeight = (int)(image.Height * ratio);
+                
+                image.Mutate(x => x.Resize(newWidth, newHeight));
+            }
+
+            // Convert to JPEG for consistent format and better compression
+            using var outputStream = new MemoryStream();
+            await image.SaveAsJpegAsync(outputStream, new JpegEncoder
+            {
+                Quality = 85 // Good balance between quality and file size
+            });
+            
+            optimizedImageData = outputStream.ToArray();
+            finalMimeType = "image/jpeg";
+
+            // Update candidate with BLOB data
+            var updateDto = new UpdateCandidateDto 
+            { 
+                PhotoData = optimizedImageData,
+                PhotoMimeType = finalMimeType,
+                PhotoFileName = $"{id}_{DateTime.UtcNow:yyyyMMdd_HHmmss}.jpg"
+            };
+            
+            var userId = GetCurrentUserId();
+            if (!userId.HasValue)
+            {
+                return Unauthorized(ApiResponse<object>.ErrorResult("User authentication required"));
+            }
+
+            var updatedCandidate = await _candidateService.UpdateCandidateAsync(id, updateDto, userId.Value);
+
+            await _auditService.LogAsync(userId.Value, "admin", "upload_photo_blob", "candidates", id, 
+                $"BLOB photo uploaded: {updateDto.PhotoFileName}, size: {optimizedImageData.Length} bytes");
+
+            return Ok(ApiResponse<object>.SuccessResult(new { 
+                message = "Photo uploaded and optimized successfully",
+                fileName = updateDto.PhotoFileName,
+                mimeType = finalMimeType,
+                sizeBytes = optimizedImageData.Length,
+                storageType = "blob"
+            }));
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, ApiResponse<object>.ErrorResult($"Failed to upload BLOB photo: {ex.Message}"));
+        }
+    }
+
+    [HttpGet("{id}/photo")]
+    public async Task<IActionResult> GetCandidatePhoto(int id)
+    {
+        try
+        {
+            // Get candidate data
+            var candidate = await _candidateService.GetCandidateByIdAsync(id);
+            if (candidate == null)
+            {
+                return NotFound(ApiResponse<object>.ErrorResult("Candidate not found"));
+            }
+
+            // Smart photo logic - prioritize BLOB over file
+            bool hasBlobPhoto = candidate.HasPhotoBlob;
+            bool hasFilePhoto = candidate.HasPhotoFile;
+
+            if (!hasBlobPhoto && !hasFilePhoto)
+            {
+                return Ok(ApiResponse<object>.SuccessResult(new { 
+                    photoUrl = (string?)null,
+                    hasPhoto = false,
+                    storageType = "none",
+                    message = "No photo available for this candidate"
+                }));
+            }
+
+            // Prefer BLOB storage if available
+            if (hasBlobPhoto)
+            {
+                // Get the full candidate model to access PhotoData
+                var candidateModel = await _candidateService.GetCandidateModelByIdAsync(id);
+                if (candidateModel?.PhotoData == null)
+                {
+                    return Ok(ApiResponse<object>.SuccessResult(new { 
+                        photoUrl = (string?)null,
+                        hasPhoto = false,
+                        storageType = "blob_missing",
+                        message = "BLOB photo data not found"
+                    }));
+                }
+
+                // Log access to BLOB photo
+                var userId = GetCurrentUserId();
+                if (userId.HasValue)
+                {
+                    await _auditService.LogAsync(userId.Value, GetCurrentUserRole() ?? "anonymous", "view_photo_blob", "candidates", id, 
+                        $"BLOB photo accessed: {candidate.PhotoFileName}");
+                }
+
+                // Return BLOB photo as Base64 data URL
+                var photoBase64 = Convert.ToBase64String(candidateModel.PhotoData);
+                var dataUrl = $"data:{candidateModel.PhotoMimeType};base64,{photoBase64}";
+
+                return Ok(ApiResponse<object>.SuccessResult(new { 
+                    photoUrl = dataUrl,
+                    hasPhoto = true,
+                    storageType = "blob",
+                    mimeType = candidateModel.PhotoMimeType,
+                    fileName = candidateModel.PhotoFileName,
+                    sizeBytes = candidateModel.PhotoData.Length,
+                    candidateName = candidate.Name
+                }));
+            }
+
+            // Fall back to file storage
+            if (hasFilePhoto)
+            {
+                // Check if photo file actually exists
+                var photoPath = candidate.PhotoUrl!.TrimStart('/');
+                var fullPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", photoPath);
+                
+                if (!System.IO.File.Exists(fullPath))
+                {
+                    return Ok(ApiResponse<object>.SuccessResult(new { 
+                        photoUrl = (string?)null,
+                        hasPhoto = false,
+                        storageType = "file_missing",
+                        message = "Photo file not found on server"
+                    }));
+                }
+
+                // Log access to file photo
+                var userId = GetCurrentUserId();
+                if (userId.HasValue)
+                {
+                    await _auditService.LogAsync(userId.Value, GetCurrentUserRole() ?? "anonymous", "view_photo_file", "candidates", id, 
+                        $"File photo accessed: {candidate.PhotoUrl}");
+                }
+
+                // Return file photo information
+                return Ok(ApiResponse<object>.SuccessResult(new { 
+                    photoUrl = candidate.PhotoUrl,
+                    hasPhoto = true,
+                    storageType = "file",
+                    fullUrl = $"{Request.Scheme}://{Request.Host}{candidate.PhotoUrl}",
+                    candidateName = candidate.Name
+                }));
+            }
+
+            return Ok(ApiResponse<object>.SuccessResult(new { 
+                photoUrl = (string?)null,
+                hasPhoto = false,
+                storageType = "none",
+                message = "No photo available"
+            }));
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, ApiResponse<object>.ErrorResult($"Failed to get candidate photo: {ex.Message}"));
+        }
+    }
+
     [HttpPut("position/{positionId}/reorder")]
     [Authorize(Roles = "admin")]
     public async Task<IActionResult> ReorderCandidates(int positionId, [FromBody] Dictionary<int, int> candidateOrders)
@@ -296,5 +508,10 @@ public class CandidateController : ControllerBase
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         return int.TryParse(userIdClaim, out var userId) ? userId : null;
+    }
+
+    private string? GetCurrentUserRole()
+    {
+        return User.FindFirst(ClaimTypes.Role)?.Value;
     }
 }

@@ -42,6 +42,15 @@ public class UpdateCandidateDto
     [Url]
     public string? PhotoUrl { get; set; }
 
+    // BLOB Photo Support - Sistema Híbrido
+    public byte[]? PhotoData { get; set; }
+    
+    [StringLength(100)]
+    public string? PhotoMimeType { get; set; }
+    
+    [StringLength(255)]
+    public string? PhotoFileName { get; set; }
+
     [Range(1, 100)]
     public int? OrderPosition { get; set; }
 
@@ -56,6 +65,15 @@ public class CandidateResponseDto
     public string? Description { get; set; }
     public string? Biography { get; set; }
     public string? PhotoUrl { get; set; }
+    
+    // Informações sobre armazenamento da foto - Sistema Híbrido
+    public bool HasPhoto { get; set; }
+    public bool HasPhotoFile { get; set; }
+    public bool HasPhotoBlob { get; set; }
+    public string? PhotoStorageType { get; set; } // "file", "blob", "both", "none"
+    public string? PhotoMimeType { get; set; }
+    public string? PhotoFileName { get; set; }
+    
     public int OrderPosition { get; set; }
     public bool IsActive { get; set; }
     public int PositionId { get; set; }
