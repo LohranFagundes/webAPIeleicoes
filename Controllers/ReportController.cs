@@ -65,15 +65,43 @@ public class ReportController : ControllerBase
             var filter = new AuditLogFilterDto { Page = 1, Limit = 10 };
             var serviceResult = await _logService.GetLogsAsync(filter);
             
+            // Test 5: Check login-specific logs
+            var loginLogs = await auditRepository.GetQueryable()
+                .Where(l => l.Action.Contains("login"))
+                .Take(10)
+                .ToListAsync();
+            
+            // Test 6: Check all distinct actions
+            var allActions = await auditRepository.GetQueryable()
+                .Select(l => l.Action)
+                .Distinct()
+                .ToListAsync();
+                
+            // Test 7: Try the exact same filter as the failing endpoint
+            var loginFilter = new AuditLogFilterDto { 
+                Page = 1, 
+                Limit = 50, 
+                Action = "login" 
+            };
+            var loginServiceResult = await _logService.GetLogsAsync(loginFilter);
+            
             return Ok(new {
                 TotalCountDirect = totalCount,
                 DirectLogsCount = directLogs.Count,
                 DirectLogs = directLogs.Select(l => new {
                     l.Id, l.UserId, l.UserType, l.Action, l.EntityType, l.LoggedAt
                 }),
+                LoginLogsCount = loginLogs.Count,
+                LoginLogs = loginLogs.Select(l => new {
+                    l.Id, l.Action, l.UserType, l.LoggedAt
+                }),
+                AllActions = allActions,
                 ServiceResultCount = serviceResult.TotalItems,
                 ServiceItems = serviceResult.Items.Count(),
-                FilterUsed = filter
+                LoginServiceResultCount = loginServiceResult.TotalItems,
+                LoginServiceItems = loginServiceResult.Items.Count(),
+                FilterUsed = filter,
+                LoginFilterUsed = loginFilter
             });
         }
         catch (Exception ex)
