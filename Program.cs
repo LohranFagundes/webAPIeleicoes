@@ -8,27 +8,42 @@ using ElectionApi.Net.Data;
 using ElectionApi.Net.Services;
 using ElectionApi.Net.Middleware;
 using DotNetEnv;
+using System.Diagnostics;
 
 // Load environment variables from .env file
 Env.Load();
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Configure timezone for Brazil (UTC-3)
+TimeZoneInfo.ClearCachedData();
+Environment.SetEnvironmentVariable("TZ", "America/Sao_Paulo");
+
 // Configure configuration to expand environment variables
 builder.Configuration.AddEnvironmentVariables();
 
-// Configure Serilog
+// Configure Serilog with Brazil timezone
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
     .Enrich.FromLogContext()
-    .WriteTo.Console()
-    .WriteTo.File("logs/election-api-.txt", rollingInterval: RollingInterval.Day)
+    .WriteTo.Console(outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss} BRT] [{Level:u3}] {Message:lj}{NewLine}{Exception}")
+    .WriteTo.File("logs/election-api-.txt", 
+        rollingInterval: RollingInterval.Day,
+        outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss} BRT] [{Level:u3}] {Message:lj}{NewLine}{Exception}")
     .CreateLogger();
 
 builder.Host.UseSerilog();
 
 // Add services to the container
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        // Configure JSON serializer to use Brazil timezone
+        options.JsonSerializerOptions.Converters.Add(new ElectionApi.Net.Converters.BrazilDateTimeConverter());
+        options.JsonSerializerOptions.Converters.Add(new ElectionApi.Net.Converters.BrazilNullableDateTimeConverter());
+        options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+        options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+    });
 builder.Services.AddHttpContextAccessor();
 
 // Database Configuration
@@ -37,16 +52,21 @@ builder.Services.AddDbContext<ElectionDbContext>((serviceProvider, options) =>
 {
     var connectionString = BuildConnectionString();
     options.UseMySql(connectionString, new MySqlServerVersion(new Version(8, 0, 21)),
-        mySqlOptions => mySqlOptions.EnableRetryOnFailure(
-            maxRetryCount: 5,
-            maxRetryDelay: TimeSpan.FromSeconds(30),
-            errorNumbersToAdd: null));
+        mySqlOptions => {
+            mySqlOptions.EnableRetryOnFailure(
+                maxRetryCount: 5,
+                maxRetryDelay: TimeSpan.FromSeconds(30),
+                errorNumbersToAdd: null);
+            // Configure MySQL to use Brazil timezone
+            mySqlOptions.CommandTimeout(30);
+        });
 });
 
 // Repository Pattern
 builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 
 // Services
+builder.Services.AddSingleton<IDateTimeService, DateTimeService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IElectionService, ElectionService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
@@ -59,9 +79,10 @@ builder.Services.AddScoped<IVotingService, VotingService>();
 builder.Services.AddScoped<IVoteCryptographyService, VoteCryptographyService>();
 builder.Services.AddScoped<ISecureVoteRepository, SecureVoteRepository>();
 builder.Services.AddScoped<IVoteCountingService, VoteCountingService>();
+builder.Services.AddScoped<ISystemSealService, SystemSealService>();
 
 // AutoMapper - commented out due to package conflicts
-// builder.Services.AddAutoMapper(cfg => cfg.AddProfile<MappingProfile>());
+builder.Services.AddAutoMapper(cfg => cfg.AddProfile<MappingProfile>());
 
 // FluentValidation
 builder.Services.AddFluentValidationAutoValidation()
@@ -148,8 +169,40 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-// Health check endpoint
-app.MapGet("/health", () => Results.Ok(new { Status = "Healthy", Timestamp = DateTime.UtcNow }));
+// Enhanced health check endpoint with comprehensive status
+app.MapGet("/health", async (ElectionDbContext dbContext, IDateTimeService dateTimeService) =>
+{
+    var healthStatus = new
+    {
+        Status = "Healthy",
+        Timestamp = dateTimeService.Now,
+        Version = "1.2.0",
+        Environment = app.Environment.EnvironmentName,
+        Timezone = "America/Sao_Paulo (BRT)",
+        Database = await CheckDatabaseHealth(dbContext),
+        Memory = GC.GetTotalMemory(false),
+        Uptime = DateTime.UtcNow.Subtract(Process.GetCurrentProcess().StartTime.ToUniversalTime()).ToString(@"dd\.hh\:mm\:ss")
+    };
+    
+    return Results.Ok(healthStatus);
+});
+
+// Health check for readiness probe
+app.MapGet("/health/ready", async (ElectionDbContext dbContext) =>
+{
+    try
+    {
+        await dbContext.Database.CanConnectAsync();
+        return Results.Ok(new { Status = "Ready", Timestamp = DateTime.UtcNow });
+    }
+    catch
+    {
+        return Results.Problem("Database not ready", statusCode: 503);
+    }
+});
+
+// Health check for liveness probe
+app.MapGet("/health/live", () => Results.Ok(new { Status = "Alive", Timestamp = DateTime.UtcNow }));
 
 // Redirect /docs to /swagger for backward compatibility
 app.MapGet("/docs", () => Results.Redirect("/swagger"));
@@ -158,7 +211,7 @@ app.MapGet("/docs", () => Results.Redirect("/swagger"));
 app.MapGet("/", () => Results.Ok(new 
 { 
     Name = "Election API .NET", 
-    Version = "1.1.0", 
+    Version = "1.2.0", 
     Environment = app.Environment.EnvironmentName,
     Documentation = "/swagger",
     Endpoints = new
@@ -219,4 +272,25 @@ static string BuildConnectionString()
     var password = Environment.GetEnvironmentVariable("DB_PASSWORD") ?? "";
 
     return $"Server={host};Port={port};Database={database};User={username};Password={password};CharSet=utf8mb4;";
+}
+
+// Helper function to check database health
+static async Task<object> CheckDatabaseHealth(ElectionDbContext dbContext)
+{
+    try
+    {
+        var canConnect = await dbContext.Database.CanConnectAsync();
+        if (!canConnect)
+        {
+            return new { Status = "Unhealthy", Message = "Cannot connect to database" };
+        }
+
+        // Test a simple query
+        var adminCount = await dbContext.Admins.CountAsync();
+        return new { Status = "Healthy", AdminCount = adminCount, Message = "Database connection successful" };
+    }
+    catch (Exception ex)
+    {
+        return new { Status = "Unhealthy", Message = ex.Message };
+    }
 }

@@ -1,13 +1,24 @@
 
 using Microsoft.EntityFrameworkCore;
 using ElectionApi.Net.Models;
+using ElectionApi.Net.Services;
 
 namespace ElectionApi.Net.Data;
 
 public class ElectionDbContext : DbContext
 {
+    private readonly IDateTimeService? _dateTimeService;
+    private readonly TimeZoneInfo _brazilTimeZone;
+
     public ElectionDbContext(DbContextOptions<ElectionDbContext> options) : base(options)
     {
+        _brazilTimeZone = TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
+    }
+
+    public ElectionDbContext(DbContextOptions<ElectionDbContext> options, IDateTimeService dateTimeService) : base(options)
+    {
+        _dateTimeService = dateTimeService;
+        _brazilTimeZone = TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
     }
 
     public DbSet<Admin> Admins { get; set; }
@@ -22,9 +33,78 @@ public class ElectionDbContext : DbContext
     public DbSet<ZeroReport> ZeroReports { get; set; }
     public DbSet<SecureVote> SecureVotes { get; set; }
 
+    public override int SaveChanges()
+    {
+        UpdateTimestampsToBrazilTime();
+        return base.SaveChanges();
+    }
+
+    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        UpdateTimestampsToBrazilTime();
+        return base.SaveChangesAsync(cancellationToken);
+    }
+
+    private void UpdateTimestampsToBrazilTime()
+    {
+        var brazilNow = _dateTimeService?.Now ?? TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, _brazilTimeZone);
+
+        var entries = ChangeTracker.Entries()
+            .Where(e => e.Entity != null &&
+                       (e.State == EntityState.Added || e.State == EntityState.Modified));
+
+        foreach (var entry in entries)
+        {
+            // Set CreatedAt for new entities
+            if (entry.State == EntityState.Added)
+            {
+                var createdAtProperty = entry.Properties.FirstOrDefault(p => p.Metadata.Name == "CreatedAt");
+                if (createdAtProperty != null)
+                {
+                    createdAtProperty.CurrentValue = brazilNow;
+                }
+
+                var timestampProperty = entry.Properties.FirstOrDefault(p => p.Metadata.Name == "Timestamp");
+                if (timestampProperty != null)
+                {
+                    timestampProperty.CurrentValue = brazilNow;
+                }
+            }
+
+            // Set UpdatedAt for new and modified entities
+            if (entry.State == EntityState.Added || entry.State == EntityState.Modified)
+            {
+                var updatedAtProperty = entry.Properties.FirstOrDefault(p => p.Metadata.Name == "UpdatedAt");
+                if (updatedAtProperty != null)
+                {
+                    updatedAtProperty.CurrentValue = brazilNow;
+                }
+
+                var lastLoginAtProperty = entry.Properties.FirstOrDefault(p => p.Metadata.Name == "LastLoginAt");
+                if (lastLoginAtProperty != null && entry.State == EntityState.Modified)
+                {
+                    lastLoginAtProperty.CurrentValue = brazilNow;
+                }
+            }
+        }
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        // Configure all DateTime properties to handle Brazil timezone
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            foreach (var property in entityType.GetProperties())
+            {
+                if (property.ClrType == typeof(DateTime) || property.ClrType == typeof(DateTime?))
+                {
+                    // Configure DateTime columns to use local timezone representation
+                    property.SetColumnType("datetime(6)");
+                }
+            }
+        }
 
         // Admin configuration
         modelBuilder.Entity<Admin>(entity =>
@@ -196,36 +276,6 @@ public class ElectionDbContext : DbContext
             foreach (var property in entity.GetProperties())
             {
                 property.SetColumnName(ToSnakeCase(property.Name));
-            }
-        }
-    }
-
-    public override int SaveChanges()
-    {
-        UpdateTimestamps();
-        return base.SaveChanges();
-    }
-
-    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
-    {
-        UpdateTimestamps();
-        return await base.SaveChangesAsync(cancellationToken);
-    }
-
-    private void UpdateTimestamps()
-    {
-        var entries = ChangeTracker.Entries()
-            .Where(e => e.Entity is BaseEntity && 
-                       (e.State == EntityState.Added || e.State == EntityState.Modified));
-
-        foreach (var entry in entries)
-        {
-            var entity = (BaseEntity)entry.Entity;
-            entity.UpdatedAt = DateTime.UtcNow;
-
-            if (entry.State == EntityState.Added)
-            {
-                entity.CreatedAt = DateTime.UtcNow;
             }
         }
     }

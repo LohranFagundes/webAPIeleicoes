@@ -13,4 +13,5 @@ public interface IVotingService
     Task<ApiResponse<ZeroReportDto>> GenerateZeroReportAsync(int electionId, int adminId, string ipAddress);
     Task<ApiResponse<IntegrityReportDto>> ValidateElectionIntegrityAsync(int electionId);
     Task<ApiResponse<bool>> CanVoteInElectionAsync(int voterId, int electionId);
+    Task<ApiResponse<ElectionValidationDto>> ValidateElectionForVotingAsync(int electionId);
 }

@@ -54,7 +54,7 @@ public class AuthService : IAuthService
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecretKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-        var expireMinutes = role == "admin" ? 59 : 10; // Admin: 59 minutes, Voter: 10 minutes
+        var expireMinutes = (role == "admin" || role == "master") ? 59 : 10; // Admin/Master: 59 minutes, Voter: 10 minutes
         var expiry = DateTime.UtcNow.AddMinutes(expireMinutes);
 
         var claims = new[]

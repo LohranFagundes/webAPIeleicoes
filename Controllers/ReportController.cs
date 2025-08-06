@@ -46,6 +46,7 @@ public class ReportController : ControllerBase
     }
 
     [HttpGet("debug-test")]
+    [AllowAnonymous]  // Temporary - Remove auth for debug testing
     public IActionResult DebugTest()
     {
         return Ok(new { 
@@ -56,6 +57,7 @@ public class ReportController : ControllerBase
     }
 
     [HttpGet("debug-audit-logs")]
+    [AllowAnonymous]  // Temporary - Remove auth for debug testing
     public async Task<IActionResult> DebugAuditLogs()
     {
         try

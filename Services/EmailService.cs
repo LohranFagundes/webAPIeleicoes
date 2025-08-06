@@ -208,10 +208,10 @@ public class EmailService : IEmailService
     {
         try
         {
-            var smtpHost = _configuration["EmailSettings:SmtpHost"];
-            var smtpPort = _configuration.GetValue<int>("EmailSettings:SmtpPort");
-            var username = _configuration["EmailSettings:Username"];
-            var password = _configuration["EmailSettings:Password"];
+            var smtpHost = _configuration["SMTP_HOST"] ?? _configuration["EmailSettings:SmtpHost"];
+            var smtpPort = _configuration.GetValue<int>("SMTP_PORT", _configuration.GetValue<int>("EmailSettings:SmtpPort"));
+            var username = _configuration["SMTP_USERNAME"] ?? _configuration["EmailSettings:Username"];
+            var password = _configuration["SMTP_PASSWORD"] ?? _configuration["EmailSettings:Password"];
 
             if (string.IsNullOrEmpty(smtpHost) || smtpPort == 0 || 
                 string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
@@ -235,11 +235,11 @@ public class EmailService : IEmailService
 
     private SmtpClient CreateSmtpClient()
     {
-        var smtpHost = _configuration["EmailSettings:SmtpHost"] ?? throw new InvalidOperationException("SMTP Host not configured");
-        var smtpPort = _configuration.GetValue<int>("EmailSettings:SmtpPort", 587);
-        var username = _configuration["EmailSettings:Username"] ?? throw new InvalidOperationException("SMTP Username not configured");
-        var password = _configuration["EmailSettings:Password"] ?? throw new InvalidOperationException("SMTP Password not configured");
-        var enableSsl = _configuration.GetValue<bool>("EmailSettings:EnableSsl", true);
+        var smtpHost = _configuration["SMTP_HOST"] ?? _configuration["EmailSettings:SmtpHost"] ?? throw new InvalidOperationException("SMTP Host not configured");
+        var smtpPort = _configuration.GetValue<int>("SMTP_PORT", _configuration.GetValue<int>("EmailSettings:SmtpPort", 587));
+        var username = _configuration["SMTP_USERNAME"] ?? _configuration["EmailSettings:Username"] ?? throw new InvalidOperationException("SMTP Username not configured");
+        var password = _configuration["SMTP_PASSWORD"] ?? _configuration["EmailSettings:Password"] ?? throw new InvalidOperationException("SMTP Password not configured");
+        var enableSsl = _configuration.GetValue<bool>("SMTP_ENABLE_SSL", _configuration.GetValue<bool>("EmailSettings:EnableSsl", true));
 
         var client = new SmtpClient(smtpHost, smtpPort)
         {
@@ -253,8 +253,8 @@ public class EmailService : IEmailService
 
     private MailMessage CreateMailMessage(string toEmail, string? toName, string subject, string body, bool isHtml, List<string>? attachments = null)
     {
-        var fromEmail = _configuration["EmailSettings:FromEmail"] ?? throw new InvalidOperationException("From Email not configured");
-        var fromName = _configuration["EmailSettings:FromName"] ?? "Election System";
+        var fromEmail = _configuration["SMTP_FROM_EMAIL"] ?? _configuration["EmailSettings:FromEmail"] ?? throw new InvalidOperationException("From Email not configured");
+        var fromName = _configuration["SMTP_FROM_NAME"] ?? _configuration["EmailSettings:FromName"] ?? "Election System";
 
         var message = new MailMessage
         {

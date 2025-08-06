@@ -16,6 +16,21 @@ public static class DataSeeder
             return; // Database has been seeded
         }
 
+        // Create master user (system developer)
+        var masterAdmin = new Admin
+        {
+            Name = "Lohran Fagundes",
+            Email = "lohran@funcorsan.com.br",
+            Password = authService.HashPassword("Master@2024!Dev"),
+            Role = "master",
+            Permissions = "{\"elections\": [\"create\", \"read\", \"update\", \"delete\"], \"voters\": [\"create\", \"read\", \"update\", \"delete\"], \"admins\": [\"create\", \"read\", \"update\", \"delete\"], \"reports\": [\"read\"], \"system\": [\"full_access\"]}",
+            IsActive = true,
+            IsSuper = true,
+            IsMaster = true
+        };
+
+        context.Admins.Add(masterAdmin);
+
         // Create default admin user
         var defaultAdmin = new Admin
         {
@@ -25,7 +40,8 @@ public static class DataSeeder
             Role = "admin",
             Permissions = "{\"elections\": [\"create\", \"read\", \"update\", \"delete\"], \"voters\": [\"create\", \"read\", \"update\", \"delete\"], \"reports\": [\"read\"]}",
             IsActive = true,
-            IsSuper = true
+            IsSuper = false,
+            IsMaster = false
         };
 
         context.Admins.Add(defaultAdmin);
@@ -63,7 +79,7 @@ public static class DataSeeder
             MaxVotesPerVoter = 1,
             VotingMethod = "single_choice",
             ResultsVisibility = "after_election",
-            CreatedBy = 1, // Will be the admin ID after save
+            CreatedBy = 1, // Will be the master admin ID after save
             UpdatedBy = 1
         };
 
@@ -71,9 +87,9 @@ public static class DataSeeder
 
         await context.SaveChangesAsync();
 
-        // Update election with correct admin ID
-        sampleElection.CreatedBy = defaultAdmin.Id;
-        sampleElection.UpdatedBy = defaultAdmin.Id;
+        // Update election with correct master admin ID
+        sampleElection.CreatedBy = masterAdmin.Id;
+        sampleElection.UpdatedBy = masterAdmin.Id;
         
         // Create sample position
         var samplePosition = new Position

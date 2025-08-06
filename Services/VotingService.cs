@@ -23,6 +23,7 @@ public class VotingService : IVotingService
     private readonly IAuditService _auditService;
     private readonly IAuthService _authService;
     private readonly ILogger<VotingService> _logger;
+    private readonly IDateTimeService _dateTimeService;
 
     public VotingService(
         IRepository<Voter> voterRepository,
@@ -37,7 +38,8 @@ public class VotingService : IVotingService
         IRepository<ZeroReport> zeroReportRepository,
         IAuditService auditService,
         IAuthService authService,
-        ILogger<VotingService> logger)
+        ILogger<VotingService> logger,
+        IDateTimeService dateTimeService)
     {
         _voterRepository = voterRepository;
         _electionRepository = electionRepository;
@@ -52,6 +54,7 @@ public class VotingService : IVotingService
         _auditService = auditService;
         _authService = authService;
         _logger = logger;
+        _dateTimeService = dateTimeService;
     }
 
     public async Task<ApiResponse<object>> LoginVoterAsync(VotingLoginDto loginDto, string ipAddress, string userAgent)
@@ -695,6 +698,76 @@ public class VotingService : IVotingService
         if (DateTime.UtcNow < election.StartDate) return "Eleição ainda não iniciou";
         if (DateTime.UtcNow > election.EndDate) return "Eleição já encerrou";
         return "Você pode votar nesta eleição";
+    }
+
+    public async Task<ApiResponse<ElectionValidationDto>> ValidateElectionForVotingAsync(int electionId)
+    {
+        try
+        {
+            _logger.LogInformation("Validating election {ElectionId} for voting", electionId);
+
+            var validation = new ElectionValidationDto();
+            var errors = new List<string>();
+
+            var election = await _electionRepository.GetByIdAsync(electionId);
+            if (election == null)
+            {
+                return ApiResponse<ElectionValidationDto>.ErrorResult("Election not found");
+            }
+
+            var currentTime = _dateTimeService.UtcNow;
+            
+            // Converter datas para UTC para comparação
+            var startDateUtc = TimeZoneInfo.ConvertTimeToUtc(election.StartDate, TimeZoneInfo.FindSystemTimeZoneById(election.Timezone));
+            var endDateUtc = TimeZoneInfo.ConvertTimeToUtc(election.EndDate, TimeZoneInfo.FindSystemTimeZoneById(election.Timezone));
+
+            validation.Status = election.Status;
+            validation.IsSealed = election.IsSealed;
+            validation.StartDate = election.StartDate;
+            validation.EndDate = election.EndDate;
+            validation.IsInVotingPeriod = currentTime >= startDateUtc && currentTime <= endDateUtc;
+            validation.IsActive = election.Status == "active";
+
+            // Regra 1: Eleição deve estar lacrada (sealed)
+            if (!election.IsSealed)
+            {
+                errors.Add("Election must be sealed before voting can begin");
+            }
+
+            // Regra 2: Eleição deve estar ativa
+            if (election.Status != "active")
+            {
+                errors.Add($"Election status must be 'active', current status: '{election.Status}'");
+            }
+
+            // Regra 3: Deve estar dentro do período de votação
+            if (currentTime < startDateUtc)
+            {
+                errors.Add($"Voting has not started yet. Starts at: {election.StartDate:yyyy-MM-dd HH:mm:ss} {election.Timezone}");
+            }
+            else if (currentTime > endDateUtc)
+            {
+                errors.Add($"Voting has ended. Ended at: {election.EndDate:yyyy-MM-dd HH:mm:ss} {election.Timezone}");
+            }
+
+            validation.ValidationErrors = errors;
+            validation.IsValid = errors.Count == 0;
+            validation.ValidationMessage = validation.IsValid 
+                ? "Election is valid for voting" 
+                : string.Join("; ", errors);
+
+            await _auditService.LogAsync(null, "system", "validate_election_for_voting", 
+                "voting_service", electionId, $"Election validation result: {validation.IsValid}");
+
+            return ApiResponse<ElectionValidationDto>.SuccessResult(validation, "Election validation completed");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error validating election {ElectionId} for voting", electionId);
+            await _auditService.LogAsync(null, "system", "validate_election_error", 
+                "voting_service", electionId, $"Error validating election: {ex.Message}");
+            return ApiResponse<ElectionValidationDto>.ErrorResult("Internal server error while validating election");
+        }
     }
 
     private string MaskCpf(string cpf)

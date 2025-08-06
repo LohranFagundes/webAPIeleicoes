@@ -23,7 +23,7 @@ public class AuthController : ControllerBase
     {
         if (!ModelState.IsValid)
         {
-            return BadRequest(ApiResponse<object>.ErrorResult("Invalid input data", ModelState));
+            return BadRequest(ApiResponse<object>.ErrorResult("Dados de entrada inválidos", ModelState));
         }
 
         try
@@ -32,14 +32,25 @@ public class AuthController : ControllerBase
             
             if (admin == null)
             {
-                await _auditService.LogAsync("admin", "login_failed", "auth", null, loginDto.Email);
-                return Unauthorized(ApiResponse<object>.ErrorResult("Invalid credentials"));
+                await _auditService.LogAsync(null, "anonymous", "login_failed", "auth", null, 
+                    $"Tentativa de login inválida para {loginDto.Email}");
+                return Unauthorized(ApiResponse<object>.ErrorResult("Credenciais inválidas"));
             }
 
-            var token = await _authService.GenerateJwtTokenAsync(admin.Id, "admin");
+            // Verifica se o administrador está ativo
+            if (!admin.IsActive)
+            {
+                await _auditService.LogAsync(admin.Id, "admin", "login_failed_inactive", "auth", admin.Id,
+                    $"Tentativa de login com conta inativa: {admin.Email}");
+                return StatusCode(403, ApiResponse<object>.ErrorResult("Conta desativada"));
+            }
+
+            // Login direto sem 2FA
+            var token = await _authService.GenerateJwtTokenAsync(admin.Id, admin.Role);
             await _authService.UpdateLastLoginAsync(admin.Id, "admin");
             
-            await _auditService.LogAsync(admin.Id, "admin", "login_success", "auth", admin.Id);
+            await _auditService.LogAsync(admin.Id, "admin", "login_success", "auth", admin.Id,
+                $"Login bem-sucedido para {admin.Email}");
 
             var response = new LoginResponseDto
             {
@@ -59,10 +70,12 @@ public class AuthController : ControllerBase
         }
         catch (Exception ex)
         {
-            await _auditService.LogAsync("system", "login_error", "auth", null, ex.Message);
-            return StatusCode(500, ApiResponse<object>.ErrorResult("Login failed"));
+            await _auditService.LogAsync(null, "system", "login_error", "auth", null, 
+                $"Erro no login: {ex.Message}");
+            return StatusCode(500, ApiResponse<object>.ErrorResult("Falha no login"));
         }
     }
+
 
     [HttpPost("voter/login")]
     public async Task<IActionResult> VoterLogin([FromBody] LoginDto loginDto)

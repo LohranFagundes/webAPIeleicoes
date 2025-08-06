@@ -19,6 +19,9 @@ public class Admin : BaseEntity
     [StringLength(50)]
     public string Role { get; set; } = "admin";
 
+    // Master user flag - only for system developer
+    public bool IsMaster { get; set; } = false;
+
     public string? Permissions { get; set; }
 
     public bool IsActive { get; set; } = true;
@@ -29,4 +32,5 @@ public class Admin : BaseEntity
 
     [StringLength(45)]
     public string? LastLoginIp { get; set; }
+
 }

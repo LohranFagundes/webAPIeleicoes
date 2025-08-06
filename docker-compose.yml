@@ -3,33 +3,40 @@ version: '3.8'
 services:
   db:
     image: mysql:8.0
-    container_name: mysql-election-system
+    container_name: mysql-election-system-v1.2.1
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
       MYSQL_DATABASE: ${DB_DATABASE}
-      MYSQL_USER: ${DB_USERNAME}
-      MYSQL_PASSWORD: ${DB_PASSWORD}
     ports:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - mysql_config:/etc/mysql/conf.d
-    command: --default-authentication-plugin=mysql_native_password --innodb-buffer-pool-size=256M
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    command: >
+      --default-authentication-plugin=mysql_native_password 
+      --innodb-buffer-pool-size=256M 
+      --max_connections=500
+      --innodb-log-file-size=128M
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD}"]
       timeout: 30s
       retries: 15
       interval: 5s
+      start_period: 30s
     networks:
       - election-network
+    restart: unless-stopped
 
   api:
     build: 
       context: .
       dockerfile: Dockerfile
       args:
-        APP_VERSION: 1.1.1
-    container_name: election-api-hybrid
+        APP_VERSION: 1.2.1
+    container_name: election-api-v1.2.1
     ports:
       - "5110:5110"
     depends_on:
@@ -40,8 +47,8 @@ services:
       DB_HOST: db
       DB_PORT: 3306
       DB_DATABASE: ${DB_DATABASE}
-      DB_USERNAME: ${DB_USERNAME}
-      DB_PASSWORD: ${DB_PASSWORD}
+      DB_USERNAME: root
+      DB_PASSWORD: ${DB_ROOT_PASSWORD}
       
       # JWT Configuration
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
@@ -75,6 +82,15 @@ services:
       PHOTO_QUALITY: ${PHOTO_QUALITY:-85}
       MAX_PHOTO_WIDTH: ${MAX_PHOTO_WIDTH:-800}
       MAX_PHOTO_HEIGHT: ${MAX_PHOTO_HEIGHT:-600}
+      
+      # System Seal Configuration
+      SYSTEM_SEAL_SECRET: ${SYSTEM_SEAL_SECRET:-system-seal-secret-key-production}
+      
+      
+      # API Features
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-true}
+      API_VERSION: 1.2.1
+      API_BUILD_DATE: "2025-08-05"
       
     volumes:
       - photo_uploads:/app/wwwroot/uploads

@@ -4,6 +4,7 @@ using ElectionApi.Net.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ElectionApi.Net.Migrations
 {
     [DbContext(typeof(ElectionDbContext))]
-    partial class ElectionDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250801143539_AddTwoFactorToAdmin")]
+    partial class AddTwoFactorToAdmin
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -45,10 +48,6 @@ namespace ElectionApi.Net.Migrations
                         .HasColumnType("tinyint(1)")
                         .HasColumnName("is_active");
 
-                    b.Property<bool>("IsMaster")
-                        .HasColumnType("tinyint(1)")
-                        .HasColumnName("is_master");
-
                     b.Property<bool>("IsSuper")
                         .HasColumnType("tinyint(1)")
                         .HasColumnName("is_super");
@@ -78,11 +77,28 @@ namespace ElectionApi.Net.Migrations
                         .HasColumnType("json")
                         .HasColumnName("permissions");
 
+                    b.Property<bool>("RequireTwoFactorAuth")
+                        .HasColumnType("tinyint(1)")
+                        .HasColumnName("require_two_factor_auth");
+
                     b.Property<string>("Role")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("varchar(50)")
                         .HasColumnName("role");
+
+                    b.Property<string>("TwoFactorToken")
+                        .HasMaxLength(6)
+                        .HasColumnType("varchar(6)")
+                        .HasColumnName("two_factor_token");
+
+                    b.Property<DateTime?>("TwoFactorTokenExpiry")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("two_factor_token_expiry");
+
+                    b.Property<DateTime?>("TwoFactorVerifiedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("two_factor_verified_at");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime(6)")

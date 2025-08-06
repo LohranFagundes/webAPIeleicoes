@@ -22,7 +22,10 @@ public class CreateAdminDto
 
     public string? Permissions { get; set; }
 
+    public bool IsActive { get; set; } = true;
+
     public bool IsSuper { get; set; } = false;
+
 }
 
 public class UpdateAdminDto
@@ -45,6 +48,7 @@ public class UpdateAdminDto
     public bool? IsActive { get; set; }
 
     public bool? IsSuper { get; set; }
+
 }
 
 public class AdminResponseDto
@@ -56,6 +60,7 @@ public class AdminResponseDto
     public string? Permissions { get; set; }
     public bool IsActive { get; set; }
     public bool IsSuper { get; set; }
+    public bool IsMaster { get; set; }
     public DateTime? LastLoginAt { get; set; }
     public string? LastLoginIp { get; set; }
     public DateTime CreatedAt { get; set; }
