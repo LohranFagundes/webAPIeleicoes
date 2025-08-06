@@ -103,6 +103,11 @@ public class ElectionDbContext : DbContext
                     // Configure DateTime columns to use local timezone representation
                     property.SetColumnType("datetime(6)");
                 }
+                // Configure string properties to use UTF-8 encoding
+                else if (property.ClrType == typeof(string))
+                {
+                    property.SetCollation("utf8mb4_unicode_ci");
+                }
             }
         }
 
@@ -112,6 +117,8 @@ public class ElectionDbContext : DbContext
             entity.HasIndex(e => e.Email).IsUnique();
             entity.Property(e => e.Password).HasMaxLength(255);
             entity.Property(e => e.Permissions).HasColumnType("json");
+            entity.Property(e => e.Name).HasColumnType("varchar(255)").UseCollation("utf8mb4_unicode_ci");
+            entity.Property(e => e.Email).HasColumnType("varchar(255)").UseCollation("utf8mb4_unicode_ci");
         });
 
         // Voter configuration
@@ -128,6 +135,8 @@ public class ElectionDbContext : DbContext
         {
             entity.Property(e => e.StartDate).HasColumnType("datetime");
             entity.Property(e => e.EndDate).HasColumnType("datetime");
+            entity.Property(e => e.Title).HasColumnType("varchar(500)").UseCollation("utf8mb4_unicode_ci");
+            entity.Property(e => e.Description).HasColumnType("text").UseCollation("utf8mb4_unicode_ci");
         });
 
         // Position configuration

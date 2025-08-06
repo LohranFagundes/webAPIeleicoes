@@ -271,7 +271,7 @@ static string BuildConnectionString()
     var username = Environment.GetEnvironmentVariable("DB_USERNAME") ?? "root";
     var password = Environment.GetEnvironmentVariable("DB_PASSWORD") ?? "";
 
-    return $"Server={host};Port={port};Database={database};User={username};Password={password};CharSet=utf8mb4;";
+    return $"Server={host};Port={port};Database={database};User={username};Password={password};CharSet=utf8mb4;UseAffectedRows=false;AllowUserVariables=true;SslMode=None;";
 }
 
 // Helper function to check database health
